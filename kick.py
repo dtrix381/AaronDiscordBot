@@ -26,6 +26,7 @@ import asyncio, time
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from pathlib import Path
 
 
 # Load .env file locally
