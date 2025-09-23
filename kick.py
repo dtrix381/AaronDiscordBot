@@ -28,9 +28,25 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 
+# Load .env file locally
 load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
 
+# ===================== CONFIG =====================
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+if not TOKEN:
+    raise SystemExit("❌ DISCORD_BOT_TOKEN is not set in environment variables.")
+
+DB_PATH = "/data/aaronjay.db"
+
+# Project root directory (where your kick.py lives)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Images folder inside project
+ASSETS_DIR = os.path.join(BASE_DIR, "images")
+BOARD_IMAGE_PATH = os.path.join(ASSETS_DIR, "monopoly_board.png")
+FONT_PATH = Path(__file__).parent / "fonts" / "Roboto-Bold.ttf"
+
+# ===================== DISCORD BOT =====================
 intents = discord.Intents.default()
 intents.guilds = True
 intents.presences = True
@@ -38,18 +54,6 @@ intents.message_content = True
 intents.messages = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
-
-
-# ===================== CONFIG =====================
-TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-DB_PATH = "/data/aaronjay.db"
-# Project root directory (where your kick.py lives)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Images folder inside project
-ASSETS_DIR = os.path.join(BASE_DIR, "images")
-BOARD_IMAGE_PATH = os.path.join(ASSETS_DIR, "monopoly_board.png")
-FONT_PATH = Path(__file__).parent / "fonts" / "Roboto-Bold.ttf"
-
 # --- Testing cheat: force next roll ---
 # maps guild_id -> (d1, d2) or guild_id -> total (we will store (d1,d2))
 FORCED_NEXT_ROLL: Dict[int, Tuple[int, int]] = {}
@@ -3749,8 +3753,6 @@ async def on_message(message: discord.Message):
     # ✅ Always call this at the very end
     await bot.process_commands(message)
 
-# ================ Run the bot =====================
+# ===================== RUN =====================
 if __name__ == "__main__":
-    if TOKEN == "REPLACE_WITH_YOUR_TOKEN":
-        raise SystemExit("Please set DISCORD_BOT_TOKEN env var or edit TOKEN in the script.")
     bot.run(TOKEN)
