@@ -2468,7 +2468,7 @@ class GiveawayView(discord.ui.View):
 
 def seconds_until_midnight_utc():
     now = datetime.now(timezone.utc)
-    target = now.replace(hour=6, minute=05, second=00, microsecond=0)
+    target = now.replace(hour=6, minute=10, second=00, microsecond=0)
     if now >= target:
         target += timedelta(days=1)
     return (target - now).total_seconds()
@@ -2476,7 +2476,7 @@ def seconds_until_midnight_utc():
 
 def seconds_until_draw():
     now = datetime.now(timezone.utc)
-    target = now.replace(hour=6, minute=0, second=00, microsecond=0)
+    target = now.replace(hour=6, minute=5, second=00, microsecond=0)
     if now >= target:
         target += timedelta(days=1)
     return (target - now).total_seconds()
