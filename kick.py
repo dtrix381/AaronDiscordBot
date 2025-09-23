@@ -3700,7 +3700,7 @@ async def on_message(message: discord.Message):
                     f"🚫 {message.author.mention}, only verified users can enter **Aaron Jay Casino HQ**.\n\n"
                     f"We need to confirm that your Kick username is **{new_nick}**. "
                     f"If it’s not, you’ll have to verify again.\n\n"
-                    f"📍 Please go to <#1283197195063132254> and verify to gain access to all channels.\n"
+                    f"📍 Please go to <#1248867557138497547> and verify to gain access to all channels.\n"
                 )
 
             except discord.Forbidden:
