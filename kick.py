@@ -906,7 +906,7 @@ async def render_board_with_players_avatars(
             # if DB fails, just continue without owners
             print(f"[render_board] owner lookup failed: {e}")
 
-    # 2) Draw avatars per tile (your existing logic)
+        # 2) Draw avatars per tile (limit to 9, show +N if extra)
     tiles: Dict[int, List[Tuple[int, str]]] = {}
     for uid, uname, pos in guild_players:
         tiles.setdefault(pos, []).append((uid, uname))
@@ -915,14 +915,20 @@ async def render_board_with_players_avatars(
         x0, y0, x1, y1 = coords.get(pos, coords[0])
         w, h = x1 - x0, y1 - y0
 
-        for i, (uid, _) in enumerate(players):
+        max_tokens = 9
+        display_players = players[:max_tokens]
+        extra_count = len(players) - max_tokens
+
+        grid_cols = 3
+        token_size = int(min(w, h) / grid_cols) - 6
+
+        for i, (uid, _) in enumerate(display_players):
             member = bot.get_user(uid)
             avatar_url = getattr(member, "display_avatar", None)
             avatar_url = avatar_url.url if avatar_url else None
             if not avatar_url:
                 continue
 
-            # Fetch avatar bytes
             try:
                 async with bot.http._HTTPClient__session.get(avatar_url) as resp:
                     avatar_bytes = await resp.read()
@@ -930,36 +936,36 @@ async def render_board_with_players_avatars(
             except Exception:
                 continue
 
-            # size & placement
-            if len(players) == 1:
-                token_size = int(min(w, h) * 0.5)
-                px, py = (x0 + x1) // 2 - token_size // 2, (y0 + y1) // 2 - token_size // 2
-            else:
-                token_size = int(min(w, h) * 0.3)
-                ox = (i % 2) * (token_size + 4)
-                oy = (i // 2) * (token_size + 4)
-                px, py = x0 + 8 + ox, y0 + 8 + oy
-
+            # resize + mask
             avatar_img = avatar_img.resize((token_size, token_size), Image.LANCZOS)
-
-            # make circular mask
             mask = Image.new("L", (token_size, token_size), 0)
-            mdraw = ImageDraw.Draw(mask)
-            mdraw.ellipse((0, 0, token_size, token_size), fill=255)
-            avatar_img = ImageOps.fit(avatar_img, (token_size, token_size))
+            ImageDraw.Draw(mask).ellipse((0, 0, token_size, token_size), fill=255)
             avatar_img.putalpha(mask)
 
             # border
             border_size = 2
-            border = Image.new("RGBA", (token_size + border_size * 2, token_size + border_size * 2), (0, 0, 0, 0))
+            border = Image.new("RGBA", (token_size + border_size*2, token_size + border_size*2), (0, 0, 0, 0))
             border_draw = ImageDraw.Draw(border)
-            border_draw.ellipse(
-                (0, 0, token_size + border_size * 2, token_size + border_size * 2),
-                fill=(255, 215, 0, 255)
-            )
+            border_draw.ellipse((0, 0, border.width, border.height), fill=(255, 215, 0, 255))
             border.paste(avatar_img, (border_size, border_size), avatar_img)
 
-            base.paste(border, (px - border_size, py - border_size), border)
+            # grid placement
+            col = i % grid_cols
+            row = i // grid_cols
+            px = x0 + 6 + col * (token_size + 6)
+            py = y0 + 6 + row * (token_size + 6)
+            base.paste(border, (px, py), border)
+
+        # Draw +N counter if extra players exist
+        if extra_count > 0:
+            txt = f"+{extra_count}"
+            draw.text(
+                ((x0 + x1)//2, (y0 + y1)//2),
+                txt,
+                font=font,
+                anchor="mm",
+                fill=(255, 0, 0)
+            )
 
     # 3) Draw owner names directly on tile (no background band)
     if owners_by_idx:
@@ -2468,7 +2474,7 @@ class GiveawayView(discord.ui.View):
 
 def seconds_until_midnight_utc():
     now = datetime.now(timezone.utc)
-    target = now.replace(hour=6, minute=10, second=00, microsecond=0)
+    target = now.replace(hour=2, minute=10, second=00, microsecond=0)
     if now >= target:
         target += timedelta(days=1)
     return (target - now).total_seconds()
@@ -2476,7 +2482,7 @@ def seconds_until_midnight_utc():
 
 def seconds_until_draw():
     now = datetime.now(timezone.utc)
-    target = now.replace(hour=6, minute=5, second=00, microsecond=0)
+    target = now.replace(hour=1, minute=5, second=00, microsecond=0)
     if now >= target:
         target += timedelta(days=1)
     return (target - now).total_seconds()
@@ -2514,7 +2520,7 @@ async def start_daily_giveaway():
             description=(
                 f"Members with <@&{ELIGIBLE_ROLE_ID}> can join by clicking below!\n\n"
                 f"🏆 **{WINNERS_COUNT} Winners** will each get **+1 Free Roll**!\n\n"
-                f"⏰ Winners drawn automatically at **<t:1758585900:t>** tomorrow."
+                f"⏰ Winners drawn automatically at **<t:1758848700:t>** tomorrow."
             ),
             color=discord.Color.green()
         )
