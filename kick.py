@@ -2474,7 +2474,7 @@ class GiveawayView(discord.ui.View):
 
 def seconds_until_midnight_utc():
     now = datetime.now(timezone.utc)
-    target = now.replace(hour=6, minute=11, second=00, microsecond=0)
+    target = now.replace(hour=1, minute=20, second=00, microsecond=0)
     if now >= target:
         target += timedelta(days=1)
     return (target - now).total_seconds()
@@ -2482,7 +2482,7 @@ def seconds_until_midnight_utc():
 
 def seconds_until_draw():
     now = datetime.now(timezone.utc)
-    target = now.replace(hour=1, minute=5, second=00, microsecond=0)
+    target = now.replace(hour=1, minute=15, second=00, microsecond=0)
     if now >= target:
         target += timedelta(days=1)
     return (target - now).total_seconds()
@@ -2520,7 +2520,7 @@ async def start_daily_giveaway():
             description=(
                 f"Members with <@&{ELIGIBLE_ROLE_ID}> can join by clicking below!\n\n"
                 f"🏆 **{WINNERS_COUNT} Winners** will each get **+1 Free Roll**!\n\n"
-                f"⏰ Winners drawn automatically at **<t:1758848700:t>** tomorrow."
+                f"⏰ Winners drawn automatically at **<t:1758849300:t>** tomorrow."
             ),
             color=discord.Color.green()
         )
