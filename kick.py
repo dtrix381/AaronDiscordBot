@@ -2609,7 +2609,7 @@ async def draw_winners_at_midnight(guild_id, message_id):
 
 @tasks.loop(hours=168)  # every 7 days
 async def collect_slot_owner_tax():
-    now = int(datetime.now(timezone.utc).timestamp())  # Current UTC time
+    now = int(datetime.now(timezone.utc).timestamp())  # current UTC time
 
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -2627,16 +2627,17 @@ async def collect_slot_owner_tax():
 
             tax_total = 0
             tax_details = []
-            repossessed = []  # Track repossessions
+            repossessed = []  # track repossessions
 
             async with db.execute(
-                "SELECT user_id, coins FROM players WHERE guild_id=?", (guild_id,)
+                "SELECT user_id, coins, last_roll FROM players WHERE guild_id=?", (guild_id,)
             ) as cur:
                 players = await cur.fetchall()
 
             for p in players:
                 user_id = p["user_id"]
                 current_coins = p["coins"]
+                last_roll = p["last_roll"] or 0
 
                 # Get owned properties
                 async with db.execute(
@@ -2648,52 +2649,60 @@ async def collect_slot_owner_tax():
                 if not owned:
                     continue
 
-                # Calculate total property value & tax
+                # Calculate total property value & base 10% tax
                 owned_idxs = [o["idx"] for o in owned]
                 total_value = sum(
                     next((sq["price"] for sq in SLOT_BOARD if sq["idx"] == idx), 0)
                     for idx in owned_idxs
                 )
                 tax = int(total_value * 0.1)
-                tax_total += tax
+
+                # 🕓 Add inactivity tax: 10 coins per full day since last roll
+                days_since_roll = max(0, (now - last_roll) // 86400)
+                inactivity_tax = days_since_roll * 10
+                total_tax = tax + inactivity_tax
+
+                tax_total += total_tax
                 prop_count = len(owned)
 
-                if current_coins >= tax:
+                if current_coins >= total_tax:
                     # ✅ Player can pay tax
                     await db.execute(
                         "UPDATE players SET coins = coins - ? WHERE guild_id=? AND user_id=?",
-                        (tax, guild_id, user_id),
+                        (total_tax, guild_id, user_id),
                     )
-                    await add_tx(db, guild_id, user_id, -tax, "Weekly Slot Owner Tax")
-                    tax_details.append((user_id, prop_count, tax))
+                    await add_tx(
+                        db, guild_id, user_id, -total_tax,
+                        f"Weekly Slot Owner Tax (10% + {days_since_roll} days inactivity = {inactivity_tax} Coins)"
+                    )
+                    tax_details.append((user_id, prop_count, tax, inactivity_tax, total_tax))
                 else:
                     # ❌ Player cannot pay → Repo all properties
-                    # Pay player their total property value
                     await db.execute(
                         "UPDATE players SET coins = coins + ? WHERE guild_id=? AND user_id=?",
                         (total_value, guild_id, user_id),
                     )
                     await add_tx(db, guild_id, user_id, total_value, "Bank repossessed all properties")
 
-                    # Remove ownership
                     await db.execute(
                         "UPDATE properties SET owner_id=NULL WHERE guild_id=? AND owner_id=?",
                         (guild_id, user_id),
                     )
 
-                    # Deduct tax after repossession
                     await db.execute(
                         "UPDATE players SET coins = coins - ? WHERE guild_id=? AND user_id=?",
-                        (tax, guild_id, user_id),
+                        (total_tax, guild_id, user_id),
                     )
-                    await add_tx(db, guild_id, user_id, -tax, "Weekly Slot Owner Tax (post-repo)")
+                    await add_tx(
+                        db, guild_id, user_id, -total_tax,
+                        f"Weekly Slot Owner Tax (10% + {days_since_roll} days inactivity = {inactivity_tax} Coins, post-repo)"
+                    )
 
-                    # Track repossessed slots for announcement
                     slot_names = [sq["name"] for sq in SLOT_BOARD if sq["idx"] in owned_idxs]
                     repossessed.append((user_id, slot_names))
-                    tax_details.append((user_id, prop_count, tax))
+                    tax_details.append((user_id, prop_count, tax, inactivity_tax, total_tax))
 
-            # Add weekly tax to prize pool
+            # Update total prize pool
             await db.execute(
                 "UPDATE game_state SET slot_prize_pool = slot_prize_pool + ?, last_tax_collection=? WHERE guild_id=?",
                 (tax_total, now, guild_id),
@@ -2707,10 +2716,11 @@ async def collect_slot_owner_tax():
                 row = await cur.fetchone()
                 total_pool = row["slot_prize_pool"] if row else tax_total
 
-            # Build announcement
+            # Build message
             breakdown_lines = [
-                f"• <@{uid}> owns **{count} slots** — paid <:coin:1418612412885635206> **${tax} Coins**"
-                for uid, count, tax in tax_details
+                f"• <@{uid}> owns **{count} slots** — paid <:coin:1418612412885635206> **${total:,} Coins** "
+                f"(**Tax:** ${base:,} + **Inactivity:** ${idle:,})"
+                for uid, count, base, idle, total in tax_details
             ]
             breakdown_msg = "\n".join(breakdown_lines) if breakdown_lines else "No slot owners were taxed this week."
 
@@ -2720,18 +2730,18 @@ async def collect_slot_owner_tax():
             ]
             if repo_lines:
                 repo_lines.append(
-                    "\n🏷️ All these properties are now **available to purchase** for whoever lands on them first!")
+                    "\n🏷️ All these properties are now **available to purchase** for whoever lands on them first!"
+                )
             repo_msg = "\n".join(repo_lines) if repo_lines else ""
 
             channel = bot.get_channel(TAX_ANNOUNCE_CHANNEL_ID)
             if channel:
-                claimable_share = int(total_pool * 0.25)  # 25% of updated pool
-
+                claimable_share = int(total_pool * 0.25)
                 await channel.send(
                     f"🏦 **Weekly Slot Owner Tax Collected!**\n"
-                    f"💰 **This Week's Total Tax:** <:coin:1418612412885635206> ${tax_total:,.2f} Coins\n"
-                    f"🎰 **Total Slot Rewards Prize Pool:** <:coin:1418612412885635206> ${total_pool:,.2f} Coins\n"
-                    f"💵 **Claimable per Reward Card (25%):** <:coin:1418612412885635206> ${claimable_share:,.2f} Coins\n\n"
+                    f"💰 **This Week’s Total Tax:** <:coin:1418612412885635206> ${tax_total:,.2f}\n"
+                    f"🎰 **Total Slot Rewards Prize Pool:** <:coin:1418612412885635206> ${total_pool:,.2f}\n"
+                    f"💵 **Claimable per Reward Card (25%):** <:coin:1418612412885635206> ${claimable_share:,.2f}\n\n"
                     f"📜 **Breakdown:**\n{breakdown_msg}\n\n"
                     f"{repo_msg}"
                 )
