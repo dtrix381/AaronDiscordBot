@@ -2389,7 +2389,7 @@ async def process_landing(interaction, db, player_row, roll, double_rent: bool =
         # 👤 Only the payer sees this in the game channel
         payer_msg = (
             f"💰 {user.mention} landed on **{sq['name']}** and paid **${rent}** rent to <@{owner_id}>.\n"
-            f"💳 Updated Balance: **${payer_bal:,.2f}**"
+            f"💳 Updated Balance: <:coin:1418612412885635206> **${payer_bal:,.2f}**"
         )
         await interaction.followup.send(payer_msg)
 
@@ -2399,8 +2399,8 @@ async def process_landing(interaction, db, player_row, roll, double_rent: bool =
             description=(
                 f"💸 <@{owner_id}> received **${rent:,.2f}** rent from {user.mention}.\n\n"
                 f"**Updated Balances:**\n"
-                f"💳 <@{owner_id}>: **${owner_bal:,.2f}** <:coin:1418612412885635206>\n"
-                f"💳 {user.mention}: **${payer_bal:,.2f}** <:coin:1418612412885635206>"
+                f"💳 <@{owner_id}>: <:coin:1418612412885635206> **${owner_bal:,.2f}** \n"
+                f"💳 {user.mention}: <:coin:1418612412885635206> **${payer_bal:,.2f}** "
             ),
             color=discord.Color.gold()
         )
