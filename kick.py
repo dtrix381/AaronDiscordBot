@@ -3810,7 +3810,7 @@ async def on_message(message: discord.Message):
     await bot.process_commands(message)
 
 
- ===================== RUN =====================
+===================== RUN =====================
 if __name__ == "__main__":
     bot = KickNotificationBot()
     bot.run(TOKEN)
