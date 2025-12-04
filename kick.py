@@ -3609,6 +3609,44 @@ async def gtb_reset(interaction: discord.Interaction):
     await interaction.response.send_message("✅ GTB data reset.")
 
 
+# Kick notification settings
+DISCORD_CHANNEL_ID = 1158852103863795723
+KICK_CHANNEL_NAME = "Aaron_Jay"
+was_live = False
+
+# Add the check stream task
+@tasks.loop(seconds=60)
+async def check_stream():
+    global was_live
+    try:
+        url = f"https://kick.com/api/v1/channels/{KICK_CHANNEL_NAME}"
+        response = requests.get(url)
+        data = response.json()
+
+        is_live = data.get('livestream') is not None
+
+        if is_live and not was_live:
+            channel = bot.get_channel(DISCORD_CHANNEL_ID)
+            if channel:
+                embed = discord.Embed(
+                    title=f"{KICK_CHANNEL_NAME} is now live on Kick!",
+                    description=f"**Title:** {data.get('livestream', {}).get('session_title', 'No Title')}",
+                    color=discord.Color.green(),
+                    url=f"https://kick.com/{KICK_CHANNEL_NAME}"
+                )
+                
+                # Add thumbnail if available
+                if 'thumbnail' in data:
+                    embed.set_thumbnail(url=data['thumbnail']['url'])
+
+                await channel.send(embed=embed)
+
+        was_live = is_live
+
+    except Exception as e:
+        print(f"Error checking stream status: {e}")
+
+
 # ------------------ Slash Commands ----------------
 @bot.event
 async def on_ready():
@@ -3691,6 +3729,7 @@ async def on_ready():
         print(f"❌ Sync error: {e}")
 
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+    check_stream.start()  # Start the stream checking loop
 
 @bot.event
 async def on_message(message: discord.Message):
@@ -3771,60 +3810,7 @@ async def on_message(message: discord.Message):
     await bot.process_commands(message)
 
 
-class KickNotificationBot:
-    def __init__(self):
-        # Bot setup
-        self.bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
-        
-        # Configuration
-        self.DISCORD_CHANNEL_ID = 1158852103863795723  # Replace with your channel ID
-        self.KICK_CHANNEL_NAME = "Aaron_Jay"  # Replace with the Kick channel name
-        self.CHECK_INTERVAL = 60  # Check every 60 seconds
-        self.was_live = False
-
-    async def check_stream_status(self):
-        try:
-            # Kick API endpoint
-            url = f"https://kick.com/api/v1/channels/{self.KICK_CHANNEL_NAME}"
-            
-            response = requests.get(url)
-            data = response.json()
-
-            is_live = data.get('livestream') is not None
-
-            # If stream just went live
-            if is_live and not self.was_live:
-                channel = self.bot.get_channel(self.DISCORD_CHANNEL_ID)
-                if channel:
-                    embed = discord.Embed(
-                        title=f"🔴 {self.KICK_CHANNEL_NAME} is now live on Kick!",
-                        description=f"**Title:** {data.get('livestream', {}).get('session_title', 'No Title')}",
-                        color=discord.Color.green(),
-                        url=f"https://kick.com/{self.KICK_CHANNEL_NAME}"
-                    )
-                    
-                    # Add thumbnail if available
-                    if 'thumbnail' in data:
-                        embed.set_thumbnail(url=data['thumbnail']['url'])
-
-                    await channel.send(embed=embed)
-
-            self.was_live = is_live
-
-        except Exception as e:
-            print(f"Error checking stream status: {e}")
-
-    @tasks.loop(seconds=60)
-    async def check_stream_loop(self):
-        await self.check_stream_status()
-
-    def start(self):
-        @self.bot.event
-        async def on_ready():
-            print(f'Bot is ready as {self.bot.user}')
-            self.check_stream_loop.start()
-
-# ===================== RUN =====================
+ ===================== RUN =====================
 if __name__ == "__main__":
     bot = KickNotificationBot()
     bot.run(TOKEN)
