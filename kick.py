@@ -3824,8 +3824,6 @@ class KickNotificationBot:
             print(f'Bot is ready as {self.bot.user}')
             self.check_stream_loop.start()
 
-        # Run the bot
-        self.bot.run('YOUR_DISCORD_BOT_TOKEN')  # Replace with your bot token
 # ===================== RUN =====================
 if __name__ == "__main__":
     bot = KickNotificationBot()
