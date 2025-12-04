@@ -3809,8 +3809,6 @@ async def on_message(message: discord.Message):
     # ✅ Always call this at the very end
     await bot.process_commands(message)
 
-
-===================== RUN =====================
+# Run the bot
 if __name__ == "__main__":
-    bot = KickNotificationBot()
     bot.run(TOKEN)
