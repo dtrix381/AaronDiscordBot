@@ -3814,7 +3814,7 @@ class KickNotificationBot:
         except Exception as e:
             print(f"Error checking stream status: {e}")
 
-    @tasks.loop(seconds=CHECK_INTERVAL)
+    @tasks.loop(seconds=60)
     async def check_stream_loop(self):
         await self.check_stream_status()
 
