@@ -3624,6 +3624,7 @@ async def check_stream():
         data = response.json()
 
         is_live = data.get("livestream") is not None
+        is_live = True
         print(f"[Kick Check] {KICK_CHANNEL_NAME} live: {is_live}")
 
         if is_live and not was_live:
