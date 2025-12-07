@@ -3625,7 +3625,7 @@ async def check_stream():
         data = response.json()
 
         is_live = data.get("livestream") is not None
-        print(f"[Kick Check] {KICK_CHANNEL_NAME} live: {is_live}")
+        print(f"[Kick Check] {KICK_USERNAME} live: {is_live}")
 
         if is_live and not was_live:
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
