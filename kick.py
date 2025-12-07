@@ -3611,7 +3611,7 @@ async def gtb_reset(interaction: discord.Interaction):
 
 # Kick notification settings
 DISCORD_CHANNEL_ID = 1158852103863795723
-KICK_CHANNEL_NAME = "Aaron_Jay"
+KICK_CHANNEL_NAME = "aaron-jay"
 was_live = False
 
 # Add the check stream task
@@ -3620,31 +3620,36 @@ async def check_stream():
     global was_live
     try:
         url = f"https://kick.com/api/v1/channels/{KICK_CHANNEL_NAME}"
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         data = response.json()
 
-        is_live = data.get('livestream') is not None
+        is_live = data.get("livestream") is not None
+        print(f"[Kick Check] {KICK_CHANNEL_NAME} live: {is_live}")
 
         if is_live and not was_live:
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
             if channel:
+                print("✅ Live detected → sending Discord message")
+
+                title = data.get("livestream", {}).get("session_title", "No Title")
+                thumbnail = data.get("livestream", {}).get("thumbnail")
+
                 embed = discord.Embed(
-                    title=f"{KICK_CHANNEL_NAME} is now live on Kick!",
-                    description=f"**Title:** {data.get('livestream', {}).get('session_title', 'No Title')}",
+                    title=f"{KICK_CHANNEL_NAME} is now LIVE on Kick!",
+                    description=f"**Title:** {title}",
                     color=discord.Color.green(),
                     url=f"https://kick.com/{KICK_CHANNEL_NAME}"
                 )
-                
-                # Add thumbnail if available
-                if 'thumbnail' in data:
-                    embed.set_thumbnail(url=data['thumbnail']['url'])
+
+                if thumbnail:
+                    embed.set_thumbnail(url=thumbnail)
 
                 await channel.send(embed=embed)
 
         was_live = is_live
 
     except Exception as e:
-        print(f"Error checking stream status: {e}")
+        print(f"❌ Kick check error: {e}")
 
 
 # ------------------ Slash Commands ----------------
