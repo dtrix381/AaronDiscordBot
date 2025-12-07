@@ -3611,7 +3611,8 @@ async def gtb_reset(interaction: discord.Interaction):
 
 # Kick notification settings
 DISCORD_CHANNEL_ID = 1158852103863795723
-KICK_CHANNEL_NAME = "aaron-jay"
+KICK_API_SLUG = "aaron-jay"
+KICK_USERNAME = "aaron_jay"
 was_live = False
 
 # Add the check stream task
@@ -3619,12 +3620,11 @@ was_live = False
 async def check_stream():
     global was_live
     try:
-        url = f"https://kick.com/api/v1/channels/{KICK_CHANNEL_NAME}"
+        url = f"https://kick.com/api/v1/channels/{KICK_API_SLUG}"
         response = requests.get(url, timeout=10)
         data = response.json()
 
         is_live = data.get("livestream") is not None
-        is_live = True
         print(f"[Kick Check] {KICK_CHANNEL_NAME} live: {is_live}")
 
         if is_live and not was_live:
@@ -3636,10 +3636,10 @@ async def check_stream():
                 thumbnail = data.get("livestream", {}).get("thumbnail")
 
                 embed = discord.Embed(
-                    title=f"{KICK_CHANNEL_NAME} is now LIVE on Kick!",
+                    title=f"{KICK_USERNAME} is now LIVE on Kick!",
                     description=f"**Title:** {title}",
                     color=discord.Color.green(),
-                    url=f"https://kick.com/{KICK_CHANNEL_NAME}"
+                    url=f"https://kick.com/{KICK_USERNAME}"
                 )
 
                 if thumbnail:
@@ -3735,6 +3735,7 @@ async def on_ready():
         print(f"❌ Sync error: {e}")
 
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+    print("Bot ready — starting Kick watcher")
     check_stream.start()  # Start the stream checking loop
 
 @bot.event
