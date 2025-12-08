@@ -3620,7 +3620,8 @@ was_live = False
 async def check_stream():
     global was_live
     try:
-        url = f"https://kick.com/api/v1/channels/{KICK_API_SLUG}"
+        url = f"https://kick.com/api/v1/channels/{KICK_API_SLUG}/livestream"
+        headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, timeout=10)
         data = response.json()
 
