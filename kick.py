@@ -27,6 +27,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pathlib import Path
+from affiliate_api import get_affiliate_summary
 
 
 # Load .env file locally
@@ -84,6 +85,8 @@ ELIGIBLE_ROLE_ID = 1419593812501594195
 WINNERS_COUNT = 5
 LOG_CHANNEL_ID = 1419655999538597929
 ALLOWED_CHANNEL_IDS = [1283632002322530314]
+API_BASE = os.getenv("AFFILIATE_API_BASE")
+API_TOKEN = os.getenv("AFFILIATE_API_TOKEN")
 
 # Store the latest giveaway message so we can track reactions
 current_giveaway_msg_id = None
@@ -3654,6 +3657,63 @@ async def check_stream():
         print(f"❌ Kick check error: {e}")
 
 
+def get_affiliate_summary(date: str) -> dict:
+    if not API_BASE or not API_TOKEN:
+        raise Exception("Affiliate API environment variables not set")
+
+    url = f"{API_BASE}/affiliates/detailed-summary/v2/{date}"
+
+    headers = {
+        "Authorization": f"Bearer {API_TOKEN}",
+        "Accept": "application/json"
+    }
+
+    response = requests.get(url, headers=headers, timeout=15)
+
+    if response.status_code != 200:
+        raise Exception(f"API error {response.status_code}: {response.text}")
+
+    return response.json()
+
+class Affiliate(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @app_commands.command(
+        name="affiliate_summary",
+        description="Get affiliate summary for a date (YYYY-MM-DD)"
+    )
+    async def affiliate_summary(
+        self,
+        interaction: discord.Interaction,
+        date: str
+    ):
+        await interaction.response.defer()
+
+        try:
+            data = get_affiliate_summary(date)
+        except Exception as e:
+            await interaction.followup.send(f"❌ {e}")
+            return
+
+        embed = discord.Embed(
+            title=f"📊 Affiliate Summary — {date}",
+            color=0x00FF99
+        )
+
+        embed.add_field(name="👥 Registrations", value=data.get("registrations", 0))
+        embed.add_field(name="🎮 Active Players", value=data.get("activePlayers", 0))
+        embed.add_field(name="💰 Deposits", value=f"${data.get('deposits', 0):,.2f}")
+        embed.add_field(name="🎲 Total Wagered", value=f"${data.get('wagers', 0):,.2f}")
+        embed.add_field(name="📉 GGR", value=f"${data.get('ggr', 0):,.2f}")
+        embed.add_field(name="📈 NGR", value=f"${data.get('ngr', 0):,.2f}")
+        embed.add_field(name="🏦 Commission", value=f"${data.get('commission', 0):,.2f}")
+
+        await interaction.followup.send(embed=embed)
+
+async def setup(bot):
+    await bot.add_cog(Affiliate(bot))
+
 # ------------------ Slash Commands ----------------
 @bot.event
 async def on_ready():
@@ -3739,6 +3799,9 @@ async def on_ready():
     print("Bot ready — starting Kick watcher")
     check_stream.start()  # Start the stream checking loop
 
+async def load_extensions():
+    await bot.load_extension("cogs.affiliate")
+    
 @bot.event
 async def on_message(message: discord.Message):
     if message.author.bot:
@@ -3819,4 +3882,5 @@ async def on_message(message: discord.Message):
 
 # Run the bot
 if __name__ == "__main__":
+    bot.loop.create_task(load_extensions())
     bot.run(TOKEN)
