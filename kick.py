@@ -27,8 +27,6 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pathlib import Path
-from affiliate_api import get_affiliate_summary
-
 
 # Load .env file locally
 load_dotenv()
@@ -3658,13 +3656,18 @@ async def check_stream():
 
 
 def get_affiliate_summary(date: str) -> dict:
-    if not API_BASE or not API_TOKEN:
+    if not os.getenv("AFFILIATE_API_BASE") or not os.getenv("AFFILIATE_API_TOKEN"):
         raise Exception("Affiliate API environment variables not set")
 
-    url = f"{API_BASE}/affiliates/detailed-summary/v2/{date}"
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise Exception("Date must be YYYY-MM-DD")
+
+    url = f"{os.getenv('AFFILIATE_API_BASE')}/affiliates/detailed-summary/v2/{date}"
 
     headers = {
-        "Authorization": f"Bearer {API_TOKEN}",
+        "Authorization": f"Bearer {os.getenv('AFFILIATE_API_TOKEN')}",
         "Accept": "application/json"
     }
 
