@@ -3778,7 +3778,6 @@ async def referral_leaderboard(interaction: discord.Interaction):
 
 BET_CHANNEL_ID = 1286302069132628111  # your channel
 POSTED_WINS = set()
-TOKEN = os.getenv("AFFILIATE_API_TOKEN")
 
 @tasks.loop(seconds=30)
 async def fetch_lucky_wins():
