@@ -3710,6 +3710,60 @@ async def affiliate_summary(interaction: discord.Interaction, date: str):
 
     await interaction.followup.send(embed=embed)
 
+# Function to fetch cumulative referral stats
+def get_total_referrals() -> list:
+    base_url = os.getenv("AFFILIATE_API_BASE").rstrip("/")
+    token = os.getenv("AFFILIATE_API_TOKEN")
+    url = f"{base_url}/affiliates/referrals/v2"  # cumulative stats endpoint
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+
+    response = requests.get(url, headers=headers, timeout=15)
+    response.raise_for_status()
+    return response.json()  # returns a list of referral stats
+
+
+# Slash command
+@bot.tree.command(
+    name="referral_leaderboard",
+    description="Show total referral stats for all referrals"
+)
+async def referral_leaderboard(interaction: discord.Interaction):
+    await interaction.response.defer()
+    try:
+        referrals = get_total_referrals()
+        if not referrals:
+            await interaction.followup.send("No referral activity found.")
+            return
+    except Exception as e:
+        await interaction.followup.send(f"❌ {e}")
+        return
+
+    # Sort by Wagered descending
+    referrals.sort(key=lambda x: x.get("wagered", 0), reverse=True)
+
+    embed = discord.Embed(
+        title="📊 Referral Leaderboard — Total Stats",
+        color=0x00FF99
+    )
+
+    # Show top 10 referrals
+    for r in referrals[:10]:
+        active = "✅" if r.get("active") else "❌"
+        embed.add_field(
+            name=r.get("username", "Unknown"),
+            value=f"Wagered: ${r.get('wagered', 0):,.2f}\n"
+                  f"Deposited: ${r.get('deposited', 0):,.2f}\n"
+                  f"Active: {active}",
+            inline=False
+        )
+
+    await interaction.followup.send(embed=embed)
+
+
 # ------------------ Slash Commands ----------------
 @bot.event
 async def on_ready():
