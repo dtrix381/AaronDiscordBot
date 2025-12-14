@@ -3656,6 +3656,32 @@ async def check_stream():
         print(f"❌ Kick check error: {e}")
 
 
+
+# --- Define function first ---
+def get_affiliate_summary(date: str) -> dict:
+    if not os.getenv("AFFILIATE_API_BASE") or not os.getenv("AFFILIATE_API_TOKEN"):
+        raise Exception("Affiliate API environment variables not set")
+
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise Exception("Date must be YYYY-MM-DD")
+
+    url = f"{os.getenv('AFFILIATE_API_BASE')}/affiliates/detailed-summary/v2/{date}"
+
+    headers = {
+        "Authorization": f"Bearer {os.getenv('AFFILIATE_API_TOKEN')}",
+        "Accept": "application/json"
+    }
+
+    response = requests.get(url, headers=headers, timeout=15)
+
+    if response.status_code != 200:
+        raise Exception(f"API error {response.status_code}: {response.text}")
+
+    return response.json()
+
+
 @bot.tree.command(
     name="affiliate_summary",
     description="Get affiliate summary for a date (YYYY-MM-DD)"
