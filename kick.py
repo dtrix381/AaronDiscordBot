@@ -3667,7 +3667,8 @@ def get_affiliate_summary(date: str) -> dict:
     except ValueError:
         raise Exception("Date must be YYYY-MM-DD")
 
-    url = f"{os.getenv('AFFILIATE_API_BASE')}/affiliates/detailed-summary/v2/{date}"
+    url = f"{os.getenv('AFFILIATE_API_BASE').rstrip('/')}/affiliates/detailed-summary/v2/{date}"
+
 
     headers = {
         "Authorization": f"Bearer {os.getenv('AFFILIATE_API_TOKEN')}",
