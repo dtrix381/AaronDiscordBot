@@ -3836,9 +3836,23 @@ async def test_lucky(interaction: discord.Interaction):
     try:
         TOKEN = os.getenv("AFFILIATE_API_TOKEN")
         url = "https://acebet.com/api/bet-feed/recent?lucky=true"
-        headers = {"Authorization": f"Bearer {TOKEN}"}
-        r = requests.get(url, headers=headers)
-        data = r.json()
+        headers = {
+            "Authorization": f"Bearer {TOKEN}",
+            "Accept": "application/json",
+            "x-currency": "REAL,CCY"
+        }
+
+        response = requests.get(url, headers=headers, timeout=15)
+        print("Status code:", response.status_code)
+        print("Response text:", response.text)
+
+        # Ensure the response is JSON before parsing
+        if response.headers.get("content-type", "").startswith("application/json"):
+            data = response.json()
+        else:
+            await interaction.followup.send(f"❌ Non-JSON response:\n{response.text}")
+            return
+
     except Exception as e:
         await interaction.followup.send(f"❌ {e}")
         return
@@ -3848,7 +3862,6 @@ async def test_lucky(interaction: discord.Interaction):
         return
 
     await interaction.followup.send(f"✅ Fetched {len(data)} Lucky Wins!")
-
 
 # ------------------ Slash Commands ----------------
 @bot.event
