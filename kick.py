@@ -3710,11 +3710,14 @@ async def affiliate_summary(interaction: discord.Interaction, date: str):
 
     await interaction.followup.send(embed=embed)
 
-# Function to fetch cumulative referral stats
+# Function to fetch cumulative referral stats (REAL endpoint)
 def get_total_referrals() -> list:
-    base_url = os.getenv("AFFILIATE_API_BASE").rstrip("/")
     token = os.getenv("AFFILIATE_API_TOKEN")
-    url = f"{base_url}/affiliates/referrals/v2"  # cumulative stats endpoint
+
+    if not token:
+        raise Exception("AFFILIATE_API_TOKEN not set")
+
+    url = "https://acebet.com/api/affiliates/users"
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -3723,16 +3726,23 @@ def get_total_referrals() -> list:
 
     response = requests.get(url, headers=headers, timeout=15)
     response.raise_for_status()
-    return response.json()  # returns a list of referral stats
+
+    data = response.json()
+
+    # Safety check (API sometimes wraps data)
+    if isinstance(data, dict) and "data" in data:
+        return data["data"]
+
+    return data
 
 
-# Slash command
 @bot.tree.command(
     name="referral_leaderboard",
     description="Show total referral stats for all referrals"
 )
 async def referral_leaderboard(interaction: discord.Interaction):
     await interaction.response.defer()
+
     try:
         referrals = get_total_referrals()
         if not referrals:
@@ -3742,7 +3752,7 @@ async def referral_leaderboard(interaction: discord.Interaction):
         await interaction.followup.send(f"❌ {e}")
         return
 
-    # Sort by Wagered descending
+    # Sort by total wagered
     referrals.sort(key=lambda x: x.get("wagered", 0), reverse=True)
 
     embed = discord.Embed(
@@ -3750,14 +3760,16 @@ async def referral_leaderboard(interaction: discord.Interaction):
         color=0x00FF99
     )
 
-    # Show top 10 referrals
     for r in referrals[:10]:
         active = "✅" if r.get("active") else "❌"
+
         embed.add_field(
             name=r.get("username", "Unknown"),
-            value=f"Wagered: ${r.get('wagered', 0):,.2f}\n"
-                  f"Deposited: ${r.get('deposited', 0):,.2f}\n"
-                  f"Active: {active}",
+            value=(
+                f"🎲 Wagered: ${r.get('wagered', 0):,.2f}\n"
+                f"💰 Deposited: ${r.get('deposited', 0):,.2f}\n"
+                f"Active: {active}"
+            ),
             inline=False
         )
 
