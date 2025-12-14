@@ -3776,92 +3776,98 @@ async def referral_leaderboard(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
-GUILD_ID = 1158852103268225104  # your guild/server ID
-BET_CHANNEL_ID = 1286302069132628111  # the channel ID where you want to post
+BET_CHANNEL_ID = 1286302069132628111  # your channel
+POSTED_WINS = set()
+TOKEN = os.getenv("AFFILIATE_API_TOKEN")
 
-# To keep track of already posted wins
-posted_ids = set()
-
+@tasks.loop(seconds=30)
 async def fetch_lucky_wins():
     url = "https://acebet.com/api/bet-feed/recent?lucky=true"
     headers = {
-        "Authorization": f"Bearer {os.getenv('AFFILIATE_API_TOKEN')}",
-        "Accept": "application/json"
+        "Authorization": f"Bearer {TOKEN}",
+        "Accept": "application/json",
+        "x-currency": "REAL,CCY"
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as resp:
-            resp.raise_for_status()
-            data = await resp.json()
-            return data  # usually a list of wins
+        try:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status != 200:
+                    print(f"❌ Lucky Wins API returned {resp.status}")
+                    return
+                data = await resp.json()
+        except Exception as e:
+            print(f"❌ Error fetching Lucky Wins: {e}")
+            return
 
-@tasks.loop(seconds=15)  # check every 15 seconds
-async def post_lucky_wins():
-    global posted_ids
+    if not data:
+        return
+
     channel = bot.get_channel(BET_CHANNEL_ID)
     if not channel:
+        print("❌ Channel not found")
         return
 
-    try:
-        wins = await fetch_lucky_wins()
-    except Exception as e:
-        print(f"Error fetching lucky wins: {e}")
-        return
+    for win in data:
+        win_id = win.get("id")
+        if win_id in POSTED_WINS:
+            continue
 
-    for win in wins:
-        win_id = win.get("id")  # unique ID for the win
-        if win_id in posted_ids:
-            continue  # skip already posted
-
-        posted_ids.add(win_id)
-
-        username = win.get("username", "Unknown")
+        user = win.get("username", "Unknown")
+        slot = win.get("slotName", "Unknown Slot")
         amount = win.get("amount", 0)
-        slot_name = win.get("slotName", "Unknown Slot")
-        slot_icon = win.get("slotIcon")  # URL to slot icon, if available
+        slot_icon = win.get("slotIcon")
 
         embed = discord.Embed(
-            title=f"🎉 Lucky Win!",
-            description=f"**{username}** just won **${amount:,.2f}** on **{slot_name}**!",
+            title="🍀 Lucky Win!",
+            description=f"**{user}** just won **${amount:,.2f}** on **{slot}**!",
             color=0xFFD700
         )
         if slot_icon:
             embed.set_thumbnail(url=slot_icon)
 
         await channel.send(embed=embed)
+        POSTED_WINS.add(win_id)
 
 @bot.tree.command(name="test_lucky", description="Test fetching Lucky Wins")
 async def test_lucky(interaction: discord.Interaction):
     await interaction.response.defer()
-    try:
-        TOKEN = os.getenv("AFFILIATE_API_TOKEN")
-        url = "https://acebet.com/api/bet-feed/recent?lucky=true"
-        headers = {
-            "Authorization": f"Bearer {TOKEN}",
-            "Accept": "application/json",
-            "x-currency": "REAL,CCY"
-        }
 
-        response = requests.get(url, headers=headers, timeout=15)
-        print("Status code:", response.status_code)
-        print("Response text:", response.text)
+    url = "https://acebet.com/api/bet-feed/recent?lucky=true"
+    headers = {
+        "Authorization": f"Bearer {os.getenv('AFFILIATE_API_TOKEN')}",
+        "Accept": "application/json",
+        "x-currency": "REAL,CCY"
+    }
 
-        # Ensure the response is JSON before parsing
-        if response.headers.get("content-type", "").startswith("application/json"):
-            data = response.json()
-        else:
-            await interaction.followup.send(f"❌ Non-JSON response:\n{response.text}")
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status != 200:
+                    await interaction.followup.send(f"❌ Lucky Wins API returned {resp.status}")
+                    return
+                data = await resp.json()
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error fetching Lucky Wins: {e}")
             return
-
-    except Exception as e:
-        await interaction.followup.send(f"❌ {e}")
-        return
 
     if not data:
         await interaction.followup.send("No Lucky Wins found.")
         return
 
-    await interaction.followup.send(f"✅ Fetched {len(data)} Lucky Wins!")
+    # Only show the first 5 for testing
+    embed = discord.Embed(title="🍀 Lucky Wins — Test", color=0xFFD700)
+    for win in data[:5]:
+        user = win.get("username", "Unknown")
+        slot = win.get("slotName", "Unknown Slot")
+        amount = win.get("amount", 0)
+        embed.add_field(
+            name=user,
+            value=f"Wagered: ${amount:,.2f} on {slot}",
+            inline=False
+        )
+
+    await interaction.followup.send(embed=embed)
 
 # ------------------ Slash Commands ----------------
 @bot.event
@@ -3947,7 +3953,7 @@ async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     print("Bot ready — starting Kick watcher")
     check_stream.start()  # Start the stream checking loop
-    post_lucky_wins.start()  # start the background task
+    fetch_lucky_wins.start()  # start the background task
 
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
