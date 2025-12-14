@@ -3691,14 +3691,15 @@ async def affiliate_summary(interaction: discord.Interaction, date: str):
     await interaction.response.defer()
     try:
         data = get_affiliate_summary(date)
+        if isinstance(data, list) and len(data) > 0:
+            data = data[0]  # take the first dict in the list
+        elif isinstance(data, list) and len(data) == 0:
+            data = {}  # empty list → treat as no data
     except Exception as e:
         await interaction.followup.send(f"❌ {e}")
         return
 
-    embed = discord.Embed(
-        title=f"📊 Affiliate Summary — {date}",
-        color=0x00FF99
-    )
+    embed = discord.Embed(title=f"📊 Affiliate Summary — {date}", color=0x00FF99)
     embed.add_field(name="👥 Registrations", value=data.get("registrations", 0))
     embed.add_field(name="🎮 Active Players", value=data.get("activePlayers", 0))
     embed.add_field(name="💰 Deposits", value=f"${data.get('deposits', 0):,.2f}")
