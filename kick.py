@@ -3830,6 +3830,25 @@ async def post_lucky_wins():
 
         await channel.send(embed=embed)
 
+@bot.tree.command(name="test_lucky", description="Test fetching Lucky Wins")
+async def test_lucky(interaction: discord.Interaction):
+    await interaction.response.defer()
+    try:
+        TOKEN = os.getenv("AFFILIATE_API_TOKEN")
+        url = "https://acebet.com/api/bet-feed/recent?lucky=true"
+        headers = {"Authorization": f"Bearer {TOKEN}"}
+        r = requests.get(url, headers=headers)
+        data = r.json()
+    except Exception as e:
+        await interaction.followup.send(f"❌ {e}")
+        return
+
+    if not data:
+        await interaction.followup.send("No Lucky Wins found.")
+        return
+
+    await interaction.followup.send(f"✅ Fetched {len(data)} Lucky Wins!")
+
 
 # ------------------ Slash Commands ----------------
 @bot.event
