@@ -55,15 +55,6 @@ intents.messages = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-class MyBot(commands.Bot):
-    async def setup_hook(self):
-        # Load your cogs here
-        await self.load_extension("cogs.affiliate")  # your affiliate cog
-        # Sync slash commands
-        await self.tree.sync()
-        print("Slash commands synced")
-
-
 # --- Testing cheat: force next roll ---
 # maps guild_id -> (d1, d2) or guild_id -> total (we will store (d1,d2))
 FORCED_NEXT_ROLL: Dict[int, Tuple[int, int]] = {}
@@ -3665,67 +3656,31 @@ async def check_stream():
         print(f"❌ Kick check error: {e}")
 
 
-def get_affiliate_summary(date: str) -> dict:
-    if not os.getenv("AFFILIATE_API_BASE") or not os.getenv("AFFILIATE_API_TOKEN"):
-        raise Exception("Affiliate API environment variables not set")
-
+@bot.tree.command(
+    name="affiliate_summary",
+    description="Get affiliate summary for a date (YYYY-MM-DD)"
+)
+async def affiliate_summary(interaction: discord.Interaction, date: str):
+    await interaction.response.defer()
     try:
-        datetime.strptime(date, "%Y-%m-%d")
-    except ValueError:
-        raise Exception("Date must be YYYY-MM-DD")
+        data = get_affiliate_summary(date)
+    except Exception as e:
+        await interaction.followup.send(f"❌ {e}")
+        return
 
-    url = f"{os.getenv('AFFILIATE_API_BASE')}/affiliates/detailed-summary/v2/{date}"
-
-    headers = {
-        "Authorization": f"Bearer {os.getenv('AFFILIATE_API_TOKEN')}",
-        "Accept": "application/json"
-    }
-
-    response = requests.get(url, headers=headers, timeout=15)
-
-    if response.status_code != 200:
-        raise Exception(f"API error {response.status_code}: {response.text}")
-
-    return response.json()
-
-class Affiliate(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-
-    @app_commands.command(
-        name="affiliate_summary",
-        description="Get affiliate summary for a date (YYYY-MM-DD)"
+    embed = discord.Embed(
+        title=f"📊 Affiliate Summary — {date}",
+        color=0x00FF99
     )
-    async def affiliate_summary(
-        self,
-        interaction: discord.Interaction,
-        date: str
-    ):
-        await interaction.response.defer()
+    embed.add_field(name="👥 Registrations", value=data.get("registrations", 0))
+    embed.add_field(name="🎮 Active Players", value=data.get("activePlayers", 0))
+    embed.add_field(name="💰 Deposits", value=f"${data.get('deposits', 0):,.2f}")
+    embed.add_field(name="🎲 Total Wagered", value=f"${data.get('wagers', 0):,.2f}")
+    embed.add_field(name="📉 GGR", value=f"${data.get('ggr', 0):,.2f}")
+    embed.add_field(name="📈 NGR", value=f"${data.get('ngr', 0):,.2f}")
+    embed.add_field(name="🏦 Commission", value=f"${data.get('commission', 0):,.2f}")
 
-        try:
-            data = get_affiliate_summary(date)
-        except Exception as e:
-            await interaction.followup.send(f"❌ {e}")
-            return
-
-        embed = discord.Embed(
-            title=f"📊 Affiliate Summary — {date}",
-            color=0x00FF99
-        )
-
-        embed.add_field(name="👥 Registrations", value=data.get("registrations", 0))
-        embed.add_field(name="🎮 Active Players", value=data.get("activePlayers", 0))
-        embed.add_field(name="💰 Deposits", value=f"${data.get('deposits', 0):,.2f}")
-        embed.add_field(name="🎲 Total Wagered", value=f"${data.get('wagers', 0):,.2f}")
-        embed.add_field(name="📉 GGR", value=f"${data.get('ggr', 0):,.2f}")
-        embed.add_field(name="📈 NGR", value=f"${data.get('ngr', 0):,.2f}")
-        embed.add_field(name="🏦 Commission", value=f"${data.get('commission', 0):,.2f}")
-
-        await interaction.followup.send(embed=embed)
-
-async def setup(bot):
-    await bot.add_cog(Affiliate(bot))
+    await interaction.followup.send(embed=embed)
 
 # ------------------ Slash Commands ----------------
 @bot.event
