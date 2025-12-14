@@ -3776,6 +3776,61 @@ async def referral_leaderboard(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
+GUILD_ID = 1158852103268225104  # your guild/server ID
+BET_CHANNEL_ID = 1286302069132628111  # the channel ID where you want to post
+
+# To keep track of already posted wins
+posted_ids = set()
+
+async def fetch_lucky_wins():
+    url = "https://acebet.com/api/bet-feed/recent?lucky=true"
+    headers = {
+        "Authorization": f"Bearer {os.getenv('AFFILIATE_API_TOKEN')}",
+        "Accept": "application/json"
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+            return data  # usually a list of wins
+
+@tasks.loop(seconds=15)  # check every 15 seconds
+async def post_lucky_wins():
+    global posted_ids
+    channel = bot.get_channel(BET_CHANNEL_ID)
+    if not channel:
+        return
+
+    try:
+        wins = await fetch_lucky_wins()
+    except Exception as e:
+        print(f"Error fetching lucky wins: {e}")
+        return
+
+    for win in wins:
+        win_id = win.get("id")  # unique ID for the win
+        if win_id in posted_ids:
+            continue  # skip already posted
+
+        posted_ids.add(win_id)
+
+        username = win.get("username", "Unknown")
+        amount = win.get("amount", 0)
+        slot_name = win.get("slotName", "Unknown Slot")
+        slot_icon = win.get("slotIcon")  # URL to slot icon, if available
+
+        embed = discord.Embed(
+            title=f"🎉 Lucky Win!",
+            description=f"**{username}** just won **${amount:,.2f}** on **{slot_name}**!",
+            color=0xFFD700
+        )
+        if slot_icon:
+            embed.set_thumbnail(url=slot_icon)
+
+        await channel.send(embed=embed)
+
+
 # ------------------ Slash Commands ----------------
 @bot.event
 async def on_ready():
@@ -3860,6 +3915,7 @@ async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     print("Bot ready — starting Kick watcher")
     check_stream.start()  # Start the stream checking loop
+    post_lucky_wins.start()  # start the background task
 
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
