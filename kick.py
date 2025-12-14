@@ -3776,38 +3776,34 @@ async def referral_leaderboard(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
-BET_CHANNEL_ID = 1286302069132628111  # your channel
+GUILD_ID = 1158852103268225104
+BET_CHANNEL_ID = 1286302069132628111
 POSTED_WINS = set()
 
-@tasks.loop(seconds=30)
 async def fetch_lucky_wins():
     url = "https://acebet.com/api/bet-feed/recent?lucky=true"
     headers = {
-        "Authorization": f"Bearer {TOKEN}",
-        "Accept": "application/json",
-        "x-currency": "REAL,CCY"
+        "Accept": "*/*",
+        "x-currency": "REAL,CCY",
+        "Cookie": f"dnm=0; token={os.getenv('AFFILIATE_API_TOKEN')}"
     }
 
     async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url, headers=headers) as resp:
-                if resp.status != 200:
-                    print(f"❌ Lucky Wins API returned {resp.status}")
-                    return
-                data = await resp.json()
-        except Exception as e:
-            print(f"❌ Error fetching Lucky Wins: {e}")
-            return
+        async with session.get(url, headers=headers) as resp:
+            if resp.status != 200:
+                print(f"❌ Lucky Wins API returned {resp.status}")
+                return []
+            return await resp.json()
 
-    if not data:
-        return
-
+@tasks.loop(seconds=30)
+async def lucky_wins_loop():
     channel = bot.get_channel(BET_CHANNEL_ID)
     if not channel:
         print("❌ Channel not found")
         return
 
-    for win in data:
+    wins = await fetch_lucky_wins()
+    for win in wins:
         win_id = win.get("id")
         if win_id in POSTED_WINS:
             continue
@@ -3834,9 +3830,9 @@ async def test_lucky(interaction: discord.Interaction):
 
     url = "https://acebet.com/api/bet-feed/recent?lucky=true"
     headers = {
-        "Authorization": f"Bearer {os.getenv('AFFILIATE_API_TOKEN')}",
-        "Accept": "application/json",
-        "x-currency": "REAL,CCY"
+        "Accept": "*/*",
+        "x-currency": "REAL,CCY",
+        "Cookie": f"dnm=0; token={os.getenv('AFFILIATE_API_TOKEN')}"
     }
 
     async with aiohttp.ClientSession() as session:
