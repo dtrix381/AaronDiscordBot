@@ -3615,47 +3615,64 @@ async def gtb_reset(interaction: discord.Interaction):
 DISCORD_CHANNEL_ID = 1158852103863795723
 KICK_API_SLUG = "aaron-jay"
 KICK_USERNAME = "aaron_jay"
+
 was_live = False
 
-# Add the check stream task
 @tasks.loop(seconds=60)
 async def check_stream():
     global was_live
-    try:
-        url = f"https://kick.com/api/v1/channels/{KICK_API_SLUG}/livestream"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, timeout=10)
-        data = response.json()
 
-        is_live = data.get("livestream") is not None
+    url = f"https://kick.com/api/v1/channels/{KICK_API_SLUG}/livestream"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "application/json",
+        "Referer": f"https://kick.com/{KICK_API_SLUG}"
+    }
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+
+        if resp.status_code != 200:
+            print(f"❌ Kick API status {resp.status_code}")
+            return
+
+        data = resp.json()
+
+        livestream = data.get("livestream")
+        is_live = livestream is not None
+
         print(f"[Kick Check] {KICK_USERNAME} live: {is_live}")
 
+        # 🔔 Just went live
         if is_live and not was_live:
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
-            if channel:
-                print("✅ Live detected → sending Discord message")
+            if not channel:
+                print("❌ Discord channel not found")
+                return
 
-                title = data.get("livestream", {}).get("session_title", "No Title")
-                thumbnail = data.get("livestream", {}).get("thumbnail")
+            title = livestream.get("session_title", "Live on Kick!")
+            thumbnail = livestream.get("thumbnail")
 
-                embed = discord.Embed(
-                    title=f"{KICK_USERNAME} is now LIVE on Kick!",
-                    description=f"**Title:** {title}",
-                    color=discord.Color.green(),
-                    url=f"https://kick.com/{KICK_USERNAME}"
-                )
+            embed = discord.Embed(
+                title=f"🔴 {KICK_USERNAME} is LIVE on Kick!",
+                description=f"**{title}**",
+                color=discord.Color.green(),
+                url=f"https://kick.com/{KICK_USERNAME}"
+            )
 
-                if thumbnail:
-                    embed.set_thumbnail(url=thumbnail)
+            if thumbnail:
+                if thumbnail.startswith("/"):
+                    thumbnail = "https://kick.com" + thumbnail
+                embed.set_thumbnail(url=thumbnail)
 
-                await channel.send(embed=embed)
+            await channel.send(embed=embed)
+            print("✅ Live notification sent")
 
         was_live = is_live
 
     except Exception as e:
         print(f"❌ Kick check error: {e}")
-
-
+        
 
 # --- Define function first ---
 def get_affiliate_summary(date: str) -> dict:
@@ -3947,8 +3964,10 @@ async def on_ready():
 
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     print("Bot ready — starting Kick watcher")
-    check_stream.start()  # Start the stream checking loop
-    fetch_lucky_wins.start()  # start the background task
+    if not check_stream.is_running():
+        check_stream.start()
+    if not fetch_lucky_wins.is_running():
+       fetch_lucky_wins.start()
 
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
