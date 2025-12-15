@@ -3617,6 +3617,7 @@ KICK_API_SLUG = "aaron-jay"
 KICK_USERNAME = "aaron_jay"
 
 was_live = False
+startup_checked = False
 
 @tasks.loop(seconds=60)
 async def check_stream():
@@ -3630,20 +3631,19 @@ async def check_stream():
     }
 
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=10) as resp:
+                if resp.status != 200:
+                    print(f"❌ Kick API status {resp.status}")
+                    return
 
-        if resp.status_code != 200:
-            print(f"❌ Kick API status {resp.status_code}")
-            return
-
-        data = resp.json()
+                data = await resp.json()
 
         livestream = data.get("livestream")
         is_live = livestream is not None
 
         print(f"[Kick Check] {KICK_USERNAME} live: {is_live}")
 
-        # 🔔 Just went live
         if is_live and not was_live:
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
             if not channel:
@@ -3672,6 +3672,7 @@ async def check_stream():
 
     except Exception as e:
         print(f"❌ Kick check error: {e}")
+
         
 async def check_stream_once():
     global was_live
@@ -4016,13 +4017,18 @@ async def on_ready():
         print(f"❌ Sync error: {e}")
 
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
-    print("Bot ready — starting Kick watcher")
-    print("Bot ready — checking Kick live status")
-    await check_stream_once()
+    
+    global startup_checked
+    if not startup_checked:
+        print("Bot ready — checking Kick live status")
+        await check_stream_once()
+        startup_checked = True
+
     if not check_stream.is_running():
         check_stream.start()
+        
     if not fetch_lucky_wins.is_running():
-       fetch_lucky_wins.start()
+        fetch_lucky_wins.start()
 
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
