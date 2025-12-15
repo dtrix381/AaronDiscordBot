@@ -87,6 +87,15 @@ ALLOWED_CHANNEL_IDS = [1283632002322530314]
 API_BASE = os.getenv("AFFILIATE_API_BASE")
 API_TOKEN = os.getenv("AFFILIATE_API_TOKEN")
 
+# Load Kick OAuth token
+KICK_TOKEN_PATH = "kick_token.json"
+KICK_OAUTH_TOKEN = None
+
+if os.path.exists(KICK_TOKEN_PATH):
+    with open(KICK_TOKEN_PATH, "r") as f:
+        data = json.load(f)
+        KICK_OAUTH_TOKEN = data.get("access_token")
+
 # Store the latest giveaway message so we can track reactions
 current_giveaway_msg_id = None
 ACTIVE_GIVEAWAYS = {}
@@ -3611,20 +3620,34 @@ async def gtb_reset(interaction: discord.Interaction):
     await interaction.response.send_message("✅ GTB data reset.")
 
 
-# Kick notification settings
+# Kick settings
 DISCORD_CHANNEL_ID = 1158852103863795723
-KICK_API_SLUG = "aaron-jay"
-KICK_USERNAME = "aaron_jay"
+KICK_USERNAME = "dtrix381"
+KICK_BROADCASTER_ID = 3753119  # <-- replace with actual broadcaster_user_id from Kick API
+DEFAULT_THUMBNAIL = "https://cdn.discordapp.com/attachments/1353382950300811394/1450100847357984799/Aaron_Jay.png?ex=69414f27&is=693ffda7&hm=1d9fd28a8ada878670b61e850630e270ef40d3afc7ccb749f8e4a65c8578e902"  # optional fallback
 
 was_live = False
+
+# Load Kick OAuth token
+KICK_OAUTH_TOKEN = None
+try:
+    with open("kick_token.json", "r") as f:
+        data = json.load(f)
+        KICK_OAUTH_TOKEN = data.get("access_token")
+except Exception as e:
+    print(f"❌ Failed to load Kick token: {e}")
 
 @tasks.loop(seconds=60)
 async def check_stream():
     global was_live
 
-    url = f"https://kick.com/api/v1/channels/{KICK_API_SLUG}"
+    if not KICK_OAUTH_TOKEN:
+        print("❌ Kick OAuth token not found, skipping check")
+        return
+
+    url = f"https://api.kick.com/public/v1/livestreams?broadcaster_user_id={KICK_BROADCASTER_ID}"
     headers = {
-        "User-Agent": "Mozilla/5.0",
+        "Authorization": f"Bearer {KICK_OAUTH_TOKEN}",
         "Accept": "application/json"
     }
 
@@ -3637,19 +3660,23 @@ async def check_stream():
 
                 data = await resp.json()
 
-        livestream = data.get("livestream") or {}
-        is_live = livestream.get("is_live", False)
+        livestreams = data.get("data", [])
+        is_live = len(livestreams) > 0
 
         print(f"[Kick Check] {KICK_USERNAME} live: {is_live}")
 
         if is_live and not was_live:
+            stream = livestreams[0]
+            title = stream.get("stream_title", "Live on Kick!")
+
+            # Safely get thumbnail, fallback to user profile pic, then default
+            user_profile_pic = data.get("user", {}).get("profile_pic") if data.get("user") else None
+            thumbnail = stream.get("thumbnail") or user_profile_pic or DEFAULT_THUMBNAIL
+
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
             if not channel:
                 print("❌ Discord channel not found")
                 return
-
-            title = livestream.get("session_title", "Live on Kick!")
-            thumbnail = data.get("profile_pic")
 
             embed = discord.Embed(
                 title=f"🔴 {KICK_USERNAME} is LIVE on Kick!",
@@ -3668,6 +3695,7 @@ async def check_stream():
 
     except Exception as e:
         print(f"❌ Kick check error: {e}")
+
 
         
 # --- Define function first ---
