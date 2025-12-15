@@ -3673,7 +3673,60 @@ async def check_stream():
     except Exception as e:
         print(f"❌ Kick check error: {e}")
         
+async def check_stream_once():
+    global was_live
 
+    url = f"https://kick.com/api/v1/channels/{KICK_API_SLUG}/livestream"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "application/json",
+        "Referer": f"https://kick.com/{KICK_API_SLUG}"
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=10) as resp:
+                if resp.status != 200:
+                    print(f"❌ Kick API status {resp.status}")
+                    return
+
+                data = await resp.json()
+
+        livestream = data.get("livestream")
+        is_live = livestream is not None
+
+        print(f"[Kick Startup Check] {KICK_USERNAME} live: {is_live}")
+
+        if is_live:
+            channel = bot.get_channel(DISCORD_CHANNEL_ID)
+            if not channel:
+                print("❌ Discord channel not found")
+                return
+
+            title = livestream.get("session_title", "Live on Kick!")
+            thumbnail = livestream.get("thumbnail")
+
+            embed = discord.Embed(
+                title=f"🔴 {KICK_USERNAME} is LIVE on Kick!",
+                description=f"**{title}**",
+                color=discord.Color.green(),
+                url=f"https://kick.com/{KICK_USERNAME}"
+            )
+
+            if thumbnail:
+                if thumbnail.startswith("/"):
+                    thumbnail = "https://kick.com" + thumbnail
+                embed.set_thumbnail(url=thumbnail)
+
+            await channel.send(embed=embed)
+            print("✅ Startup live notification sent")
+
+        # Important: mark current state
+        was_live = is_live
+
+    except Exception as e:
+        print(f"❌ Kick startup check error: {e}")
+        
 # --- Define function first ---
 def get_affiliate_summary(date: str) -> dict:
     if not os.getenv("AFFILIATE_API_BASE") or not os.getenv("AFFILIATE_API_TOKEN"):
@@ -3964,6 +4017,8 @@ async def on_ready():
 
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     print("Bot ready — starting Kick watcher")
+    print("Bot ready — checking Kick live status")
+    await check_stream_once()
     if not check_stream.is_running():
         check_stream.start()
     if not fetch_lucky_wins.is_running():
