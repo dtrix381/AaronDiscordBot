@@ -3622,8 +3622,8 @@ async def gtb_reset(interaction: discord.Interaction):
 
 # Kick settings
 DISCORD_CHANNEL_ID = 1158852103863795723
-KICK_USERNAME = "dtrix381"
-KICK_BROADCASTER_ID = 3753119  # <-- replace with actual broadcaster_user_id from Kick API
+KICK_USERNAME = "aaron-jay"
+KICK_BROADCASTER_ID = 4826537  # <-- replace with actual broadcaster_user_id from Kick API
 DEFAULT_THUMBNAIL = "https://cdn.discordapp.com/attachments/1353382950300811394/1450100847357984799/Aaron_Jay.png?ex=69414f27&is=693ffda7&hm=1d9fd28a8ada878670b61e850630e270ef40d3afc7ccb749f8e4a65c8578e902"  # optional fallback
 
 was_live = False
