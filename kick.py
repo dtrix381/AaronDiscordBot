@@ -3623,31 +3623,16 @@ async def gtb_reset(interaction: discord.Interaction):
 # Kick settings
 DISCORD_CHANNEL_ID = 1158852103863795723
 KICK_USERNAME = "aaron-jay"
-KICK_BROADCASTER_ID = 4826537  # <-- replace with actual broadcaster_user_id from Kick API
-DEFAULT_THUMBNAIL = "https://cdn.discordapp.com/attachments/1353382950300811394/1450100847357984799/Aaron_Jay.png?ex=69414f27&is=693ffda7&hm=1d9fd28a8ada878670b61e850630e270ef40d3afc7ccb749f8e4a65c8578e902"  # optional fallback
 
 was_live = False
 
-# Load Kick OAuth token
-KICK_OAUTH_TOKEN = None
-try:
-    with open("kick_token.json", "r") as f:
-        data = json.load(f)
-        KICK_OAUTH_TOKEN = data.get("access_token")
-except Exception as e:
-    print(f"❌ Failed to load Kick token: {e}")
-
-@tasks.loop(seconds=60)
+@tasks.loop(seconds=10)
 async def check_stream():
     global was_live
 
-    if not KICK_OAUTH_TOKEN:
-        print("❌ Kick OAuth token not found, skipping check")
-        return
-
-    url = f"https://api.kick.com/public/v1/livestreams?broadcaster_user_id={KICK_BROADCASTER_ID}"
+    url = f"https://kick.com/api/v1/channels/{KICK_USERNAME}"
     headers = {
-        "Authorization": f"Bearer {KICK_OAUTH_TOKEN}",
+        "User-Agent": "Mozilla/5.0",
         "Accept": "application/json"
     }
 
@@ -3660,18 +3645,18 @@ async def check_stream():
 
                 data = await resp.json()
 
-        livestreams = data.get("data", [])
-        is_live = len(livestreams) > 0
+        livestream = data.get("livestream") or {}
+        is_live = livestream.get("is_live", False)
 
         print(f"[Kick Check] {KICK_USERNAME} live: {is_live}")
 
         if is_live and not was_live:
-            stream = livestreams[0]
-            title = stream.get("stream_title", "Live on Kick!")
-
-            # Safely get thumbnail, fallback to user profile pic, then default
-            user_profile_pic = data.get("user", {}).get("profile_pic") if data.get("user") else None
-            thumbnail = stream.get("thumbnail") or user_profile_pic or DEFAULT_THUMBNAIL
+            title = livestream.get("session_title", "Live on Kick!")
+            thumbnail = (
+                livestream.get("thumbnail") or
+                data.get("profile_pic") or
+                data.get("user", {}).get("profile_pic")
+            )
 
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
             if not channel:
@@ -3695,7 +3680,6 @@ async def check_stream():
 
     except Exception as e:
         print(f"❌ Kick check error: {e}")
-
 
         
 # --- Define function first ---
