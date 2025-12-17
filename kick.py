@@ -3646,18 +3646,17 @@ async def check_stream():
                 data = await resp.json()
 
         livestream = data.get("livestream")
-        is_live = bool(livestream)
+        is_live = bool(livestream and livestream.get("id"))
 
         print(f"[Kick Check] {KICK_USERNAME} live: {is_live}")
         print("DEBUG LIVESTREAM:", livestream)
 
         if is_live and not was_live:
-            title = livestream.get("session_title", "Live on Kick!") if livestream else "Live on Kick!"
+            title = livestream.get("session_title", "Live on Kick!")
 
             thumbnail = (
-                livestream.get("thumbnail") if livestream else None
+                livestream.get("thumbnail")
                 or data.get("profile_pic")
-                or data.get("user", {}).get("profile_pic")
             )
 
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
@@ -3803,94 +3802,6 @@ async def referral_leaderboard(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
-GUILD_ID = 1158852103268225104
-BET_CHANNEL_ID = 1286302069132628111
-POSTED_WINS = set()
-
-tasks.loop(seconds=10)
-async def fetch_lucky_wins():
-    url = "https://acebet.com/api/bet-feed/recent?lucky=true"
-    headers = {
-        "Accept": "*/*",
-        "x-currency": "REAL,CCY",
-        "Cookie": f"dnm=0; token={os.getenv('AFFILIATE_API_TOKEN')}"
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as resp:
-            if resp.status != 200:
-                print(f"❌ Lucky Wins API returned {resp.status}")
-                return []
-            return await resp.json()
-
-@tasks.loop(seconds=30)
-async def lucky_wins_loop():
-    channel = bot.get_channel(BET_CHANNEL_ID)
-    if not channel:
-        print("❌ Channel not found")
-        return
-
-    wins = await fetch_lucky_wins()
-    for win in wins:
-        win_id = win.get("id")
-        if win_id in POSTED_WINS:
-            continue
-
-        user = win.get("username", "Unknown")
-        slot = win.get("slotName", "Unknown Slot")
-        amount = win.get("amount", 0)
-        slot_icon = win.get("slotIcon")
-
-        embed = discord.Embed(
-            title="🍀 Lucky Win!",
-            description=f"**{user}** just won **${amount:,.2f}** on **{slot}**!",
-            color=0xFFD700
-        )
-        if slot_icon:
-            embed.set_thumbnail(url=slot_icon)
-
-        await channel.send(embed=embed)
-        POSTED_WINS.add(win_id)
-
-@bot.tree.command(name="test_lucky", description="Test fetching Lucky Wins")
-async def test_lucky(interaction: discord.Interaction):
-    await interaction.response.defer()
-
-    url = "https://acebet.com/api/bet-feed/recent?lucky=true"
-    headers = {
-        "Accept": "*/*",
-        "x-currency": "REAL,CCY",
-        "Cookie": f"dnm=0; token={os.getenv('AFFILIATE_API_TOKEN')}"
-    }
-
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url, headers=headers) as resp:
-                if resp.status != 200:
-                    await interaction.followup.send(f"❌ Lucky Wins API returned {resp.status}")
-                    return
-                data = await resp.json()
-        except Exception as e:
-            await interaction.followup.send(f"❌ Error fetching Lucky Wins: {e}")
-            return
-
-    if not data:
-        await interaction.followup.send("No Lucky Wins found.")
-        return
-
-    # Only show the first 5 for testing
-    embed = discord.Embed(title="🍀 Lucky Wins — Test", color=0xFFD700)
-    for win in data[:5]:
-        user = win.get("username", "Unknown")
-        slot = win.get("slotName", "Unknown Slot")
-        amount = win.get("amount", 0)
-        embed.add_field(
-            name=user,
-            value=f"Wagered: ${amount:,.2f} on {slot}",
-            inline=False
-        )
-
-    await interaction.followup.send(embed=embed)
 
 # ------------------ Slash Commands ----------------
 @bot.event
@@ -3978,9 +3889,6 @@ async def on_ready():
         check_stream.start()
         print("▶️ Kick stream checker started")
     
-    if not fetch_lucky_wins.is_running():
-        fetch_lucky_wins.start()
-
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
     
