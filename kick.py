@@ -3628,6 +3628,7 @@ was_live = False
 
 @tasks.loop(seconds=10)
 async def check_stream():
+    print("⏱️ check_stream tick")
     global was_live
 
     url = f"https://kick.com/api/v1/channels/{KICK_USERNAME}"
@@ -3682,7 +3683,12 @@ async def check_stream():
     except Exception as e:
         print(f"❌ Kick check error: {e}")
 
-        
+@check_stream.before_loop
+async def before_check_stream():
+    print("⏳ Waiting for bot to be ready before starting Kick checker...")
+    await bot.wait_until_ready()
+    print("✅ Bot ready, Kick checker allowed to run")
+            
 # --- Define function first ---
 def get_affiliate_summary(date: str) -> dict:
     if not os.getenv("AFFILIATE_API_BASE") or not os.getenv("AFFILIATE_API_TOKEN"):
@@ -3801,9 +3807,6 @@ async def referral_leaderboard(interaction: discord.Interaction):
 
     await interaction.followup.send(embed=embed)
 
-
-
-# ------------------ Slash Commands ----------------
 @bot.event
 async def on_ready():
     await init_db()
@@ -3886,8 +3889,10 @@ async def on_ready():
 
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     if not check_stream.is_running():
+        print("▶️ Starting Kick stream checker...")
         check_stream.start()
-        print("▶️ Kick stream checker started")
+    else:
+        print("⏩ Kick stream checker already running")
     
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
