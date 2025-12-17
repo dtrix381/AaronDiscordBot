@@ -3622,7 +3622,7 @@ async def gtb_reset(interaction: discord.Interaction):
 
 # Kick settings
 DISCORD_CHANNEL_ID = 1158852103863795723
-KICK_USERNAME = "aaron-jay"
+KICK_USERNAME = "aaron_jay"
 
 was_live = False
 
@@ -3645,17 +3645,19 @@ async def check_stream():
 
                 data = await resp.json()
 
-        livestream = data.get("livestream") or {}
-        is_live = livestream.get("is_live", False)
+        livestream = data.get("livestream")
+        is_live = bool(livestream)
 
         print(f"[Kick Check] {KICK_USERNAME} live: {is_live}")
+        print("DEBUG LIVESTREAM:", livestream)
 
         if is_live and not was_live:
-            title = livestream.get("session_title", "Live on Kick!")
+            title = livestream.get("session_title", "Live on Kick!") if livestream else "Live on Kick!"
+
             thumbnail = (
-                livestream.get("thumbnail") or
-                data.get("profile_pic") or
-                data.get("user", {}).get("profile_pic")
+                livestream.get("thumbnail") if livestream else None
+                or data.get("profile_pic")
+                or data.get("user", {}).get("profile_pic")
             )
 
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
@@ -3974,6 +3976,7 @@ async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     if not check_stream.is_running():
         check_stream.start()
+        print("▶️ Kick stream checker started")
     
     if not fetch_lucky_wins.is_running():
         fetch_lucky_wins.start()
