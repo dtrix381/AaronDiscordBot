@@ -3688,10 +3688,6 @@ async def before_check_stream():
     print("⏳ Waiting for bot to be ready before starting Kick checker...")
     await bot.wait_until_ready()
     print("✅ Bot ready, Kick checker allowed to run")
-
-# Start the Kick checker safely after the bot is ready
-if not check_stream.is_running():
-    check_stream.start()
             
 # --- Define function first ---
 def get_affiliate_summary(date: str) -> dict:
@@ -3890,6 +3886,11 @@ async def on_ready():
         print("✅ Slash commands synced.")
     except Exception as e:
         print(f"❌ Sync error: {e}")
+    
+    print(f"✅ Logged in as {bot.user}")
+    if not check_stream.is_running():
+        check_stream.start()
+        print("▶️ Kick stream checker started")
 
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
