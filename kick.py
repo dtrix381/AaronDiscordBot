@@ -3623,9 +3623,11 @@ async def gtb_reset(interaction: discord.Interaction):
 
 sys.stdout.reconfigure(line_buffering=True)
 
-# Kick settings
 DISCORD_CHANNEL_ID = 1158852103863795723
 KICK_USERNAME = "aaron_jay"
+
+KICK_API_URL = f"https://kick.com/api/v1/channels/{KICK_USERNAME}"
+PROXY_URL = f"https://aaronjay.dtrix381.workers.dev?u={KICK_API_URL}"
 
 was_live = False
 
@@ -3634,26 +3636,19 @@ async def check_stream():
     global was_live
     print("⏱️ check_stream tick", flush=True)
 
-    url = f"https://kick.com/api/v1/channels/{KICK_USERNAME}"
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "application/json",
-        "Referer": f"https://kick.com/{KICK_USERNAME}",
-        "Origin": "https://kick.com"
-    }
-
     try:
-        async with aiohttp.ClientSession(headers=headers) as session:
-            async with session.get(url, timeout=10) as resp:
-                print(f"🌐 Kick status {resp.status}", flush=True)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(PROXY_URL, timeout=10) as resp:
+                print("🌐 Kick status", resp.status, flush=True)
 
                 if resp.status != 200:
                     return
 
                 data = await resp.json()
 
-        is_live = data.get("livestream") is not None
+        livestream = data.get("livestream")
+        is_live = livestream is not None
+
         print(f"[Kick Check] live={is_live}", flush=True)
 
         if is_live and not was_live:
@@ -3662,17 +3657,20 @@ async def check_stream():
                 await channel.send(
                     f"🔴 **{KICK_USERNAME} is LIVE on Kick!**\nhttps://kick.com/{KICK_USERNAME}"
                 )
+                print("✅ Live notification sent", flush=True)
 
         was_live = is_live
 
     except Exception as e:
         print(f"❌ Kick error: {e}", flush=True)
 
+
 @check_stream.before_loop
 async def before_check_stream():
-    print("⏳ Waiting for bot to be ready before starting Kick checker...")
+    print("⏳ Waiting for bot to be ready before starting Kick checker...", flush=True)
     await bot.wait_until_ready()
-    print("✅ Bot ready, Kick checker allowed to run")
+    print("✅ Bot ready, Kick checker allowed to run", flush=True)
+
             
 # --- Define function first ---
 def get_affiliate_summary(date: str) -> dict:
