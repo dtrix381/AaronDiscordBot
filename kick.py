@@ -3629,7 +3629,7 @@ was_live = False
 @tasks.loop(seconds=10)
 async def check_stream():
     global was_live
-    print("⏱️ check_stream tick")
+    print("⏱️ check_stream tick", flush=True)
 
     try:
         url = f"https://kick.com/api/v1/channels/{KICK_CHANNEL_NAME}"
