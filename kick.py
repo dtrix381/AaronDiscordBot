@@ -3689,6 +3689,8 @@ async def check_stream():
             # ✅ SAFE thumbnail handling
             if is_valid_image_url(thumbnail):
                 embed.set_thumbnail(url=thumbnail)
+            else:
+                embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1353382950300811394/1450100847357984799/Aaron_Jay.png?ex=69449ae7&is=69434967&hm=da5e8564c4370b1629f4ec0fc09880f6d0b05d71835c222811486b60be97c9f7")
 
             content = (
                 f"<@&{LIVE_ROLE_ID}>\n"
