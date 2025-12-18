@@ -3624,12 +3624,27 @@ async def gtb_reset(interaction: discord.Interaction):
 sys.stdout.reconfigure(line_buffering=True)
 
 DISCORD_CHANNEL_ID = 1158852103863795723
+STREAMER_USER_ID = 1158851118810529862
+LIVE_ROLE_ID = 1419593554988236872
 KICK_USERNAME = "aaron_jay"
 
 KICK_API_URL = f"https://kick.com/api/v1/channels/{KICK_USERNAME}"
 PROXY_URL = f"https://aaronjay.dtrix381.workers.dev?u={KICK_API_URL}"
 
 was_live = False
+
+class KickLiveView(discord.ui.View):
+    def __init__(self, kick_username: str):
+        super().__init__(timeout=None)
+
+        self.add_item(
+            discord.ui.Button(
+                label="Watch Aaron Live on Kick",
+                url=f"https://kick.com/{kick_username}",
+                style=discord.ButtonStyle.link,
+                emoji="▶️"
+            )
+        )
 
 @tasks.loop(seconds=10)
 async def check_stream():
@@ -3654,9 +3669,34 @@ async def check_stream():
         if is_live and not was_live:
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
             if channel:
-                await channel.send(
-                    f"🔴 **{KICK_USERNAME} is LIVE on Kick!**\nhttps://kick.com/{KICK_USERNAME}"
+                title = livestream.get("session_title", "Live on Kick!")
+                thumbnail = livestream.get("thumbnail")
+
+                # Embed
+                embed = discord.Embed(
+                    title=f"{KICK_USERNAME} is LIVE on Kick!",
+                    description=f"**{title}**",
+                    color=discord.Color.red(),
+                    url=f"https://kick.com/{KICK_USERNAME}"
                 )
+
+                if thumbnail:
+                    embed.set_image(url=thumbnail)
+
+                # Mentions message
+                content = (
+                    f"<@&{LIVE_ROLE_ID}>\n"
+                    f"<@{STREAMER_USER_ID}> is live right now!**"
+                )
+
+                view = KickLiveView(KICK_USERNAME)
+
+                await channel.send(
+                    content=content,
+                    embed=embed,
+                    view=view
+                )
+
                 print("✅ Live notification sent", flush=True)
 
         was_live = is_live
