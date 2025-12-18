@@ -27,6 +27,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pathlib import Path
+import sys
 
 # Load .env file locally
 load_dotenv()
@@ -3620,6 +3621,8 @@ async def gtb_reset(interaction: discord.Interaction):
     await interaction.response.send_message("✅ GTB data reset.")
 
 
+sys.stdout.reconfigure(line_buffering=True)
+
 # Kick settings
 DISCORD_CHANNEL_ID = 1158852103863795723
 KICK_USERNAME = "aaron_jay"
@@ -3631,53 +3634,39 @@ async def check_stream():
     global was_live
     print("⏱️ check_stream tick", flush=True)
 
+    url = f"https://kick.com/api/v1/channels/{KICK_USERNAME}"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "application/json",
+        "Referer": f"https://kick.com/{KICK_USERNAME}",
+        "Origin": "https://kick.com"
+    }
+
     try:
-        url = f"https://kick.com/api/v1/channels/{KICK_CHANNEL_NAME}"
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url, timeout=10) as resp:
+                print(f"🌐 Kick status {resp.status}", flush=True)
 
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json",
-            "Referer": f"https://kick.com/{KICK_CHANNEL_NAME}",
-            "Origin": "https://kick.com"
-        }
+                if resp.status != 200:
+                    return
 
-        response = requests.get(url, headers=headers, timeout=10)
+                data = await resp.json()
 
-        if response.status_code != 200:
-            print(f"❌ Kick API status {response.status_code}")
-            return
-
-        data = response.json()
         is_live = data.get("livestream") is not None
-
-        print(f"[Kick Check] {KICK_CHANNEL_NAME} live: {is_live}")
+        print(f"[Kick Check] live={is_live}", flush=True)
 
         if is_live and not was_live:
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
             if channel:
-                print("✅ Live detected → sending Discord message")
-
-                title = data.get("livestream", {}).get("session_title", "No Title")
-                thumbnail = data.get("livestream", {}).get("thumbnail")
-
-                embed = discord.Embed(
-                    title=f"{KICK_CHANNEL_NAME} is now LIVE on Kick!",
-                    description=f"**Title:** {title}",
-                    color=discord.Color.green(),
-                    url=f"https://kick.com/{KICK_CHANNEL_NAME}"
+                await channel.send(
+                    f"🔴 **{KICK_USERNAME} is LIVE on Kick!**\nhttps://kick.com/{KICK_USERNAME}"
                 )
-
-                if thumbnail:
-                    embed.set_thumbnail(url=thumbnail)
-
-                await channel.send(embed=embed)
 
         was_live = is_live
 
     except Exception as e:
-        print(f"❌ Kick check error: {e}")
+        print(f"❌ Kick error: {e}", flush=True)
 
 @check_stream.before_loop
 async def before_check_stream():
@@ -3805,6 +3794,7 @@ async def referral_leaderboard(interaction: discord.Interaction):
 
 @bot.event
 async def on_ready():
+    print("🤖 Bot ready — starting Kick checker", flush=True)
     await init_db()
     if not os.path.exists(BOARD_IMAGE_PATH):
         os.makedirs(ASSETS_DIR, exist_ok=True)
@@ -3883,7 +3873,6 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Sync error: {e}")
     
-    print(f"✅ Logged in as {bot.user}")
     if not check_stream.is_running():
         check_stream.start()
         print("▶️ Kick stream checker started")
