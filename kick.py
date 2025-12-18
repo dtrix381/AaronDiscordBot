@@ -3628,55 +3628,51 @@ was_live = False
 
 @tasks.loop(seconds=10)
 async def check_stream():
-    print("⏱️ check_stream tick")
     global was_live
-
-    url = f"https://kick.com/api/v1/channels/{KICK_USERNAME}"
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json"
-    }
+    print("⏱️ check_stream tick")
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, timeout=10) as resp:
-                if resp.status != 200:
-                    print(f"❌ Kick API status {resp.status}")
-                    return
+        url = f"https://kick.com/api/v1/channels/{KICK_CHANNEL_NAME}"
 
-                data = await resp.json()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Referer": f"https://kick.com/{KICK_CHANNEL_NAME}",
+            "Origin": "https://kick.com"
+        }
 
-        livestream = data.get("livestream")
-        is_live = bool(livestream and livestream.get("id"))
+        response = requests.get(url, headers=headers, timeout=10)
 
-        print(f"[Kick Check] {KICK_USERNAME} live: {is_live}")
-        print("DEBUG LIVESTREAM:", livestream)
+        if response.status_code != 200:
+            print(f"❌ Kick API status {response.status_code}")
+            return
+
+        data = response.json()
+        is_live = data.get("livestream") is not None
+
+        print(f"[Kick Check] {KICK_CHANNEL_NAME} live: {is_live}")
 
         if is_live and not was_live:
-            title = livestream.get("session_title", "Live on Kick!")
-
-            thumbnail = (
-                livestream.get("thumbnail")
-                or data.get("profile_pic")
-            )
-
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
-            if not channel:
-                print("❌ Discord channel not found")
-                return
+            if channel:
+                print("✅ Live detected → sending Discord message")
 
-            embed = discord.Embed(
-                title=f"🔴 {KICK_USERNAME} is LIVE on Kick!",
-                description=f"**{title}**",
-                color=discord.Color.red(),
-                url=f"https://kick.com/{KICK_USERNAME}"
-            )
+                title = data.get("livestream", {}).get("session_title", "No Title")
+                thumbnail = data.get("livestream", {}).get("thumbnail")
 
-            if thumbnail:
-                embed.set_thumbnail(url=thumbnail)
+                embed = discord.Embed(
+                    title=f"{KICK_CHANNEL_NAME} is now LIVE on Kick!",
+                    description=f"**Title:** {title}",
+                    color=discord.Color.green(),
+                    url=f"https://kick.com/{KICK_CHANNEL_NAME}"
+                )
 
-            await channel.send(embed=embed)
-            print("✅ Live notification sent")
+                if thumbnail:
+                    embed.set_thumbnail(url=thumbnail)
+
+                await channel.send(embed=embed)
 
         was_live = is_live
 
