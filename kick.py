@@ -3646,6 +3646,12 @@ class KickLiveView(discord.ui.View):
             )
         )
 
+def is_valid_image_url(url: str) -> bool:
+    """Check if a URL is a valid image link (jpg, png, gif, webp) anywhere in the URL."""
+    if not url or not isinstance(url, str):
+        return False
+    return any(ext in url.lower() for ext in (".png", ".jpg", ".jpeg", ".gif", ".webp"))
+    
 @tasks.loop(seconds=10)
 async def check_stream():
     global was_live
