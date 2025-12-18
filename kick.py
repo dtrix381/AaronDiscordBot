@@ -3663,46 +3663,47 @@ async def check_stream():
 
         livestream = data.get("livestream")
         is_live = livestream is not None
-
         print(f"[Kick Check] live={is_live}", flush=True)
 
         if is_live and not was_live:
             channel = bot.get_channel(DISCORD_CHANNEL_ID)
-            if channel:
-                title = livestream.get("session_title", "Live on Kick!")
-                thumbnail = livestream.get("thumbnail")
+            if not channel:
+                return
 
-                # Embed
-                embed = discord.Embed(
-                    title=f"{KICK_USERNAME} is LIVE on Kick!",
-                    description=f"**{title}**",
-                    color=discord.Color.red(),
-                    url=f"https://kick.com/{KICK_USERNAME}"
-                )
+            title = livestream.get("session_title") or "Live on Kick!"
+            thumbnail = livestream.get("thumbnail")
 
-                if thumbnail:
-                    embed.set_image(url=thumbnail)
+            embed = discord.Embed(
+                title=f"🔴 {KICK_USERNAME} is LIVE on Kick!",
+                description=f"**{title}**",
+                color=discord.Color.red(),
+                url=f"https://kick.com/{KICK_USERNAME}"
+            )
 
-                # Mentions message
-                content = (
-                    f"<@&{LIVE_ROLE_ID}>\n"
-                    f"<@{STREAMER_USER_ID}> is live right now!**"
-                )
+            # ✅ SAFE thumbnail handling
+            if is_valid_image_url(thumbnail):
+                embed.set_thumbnail(url=thumbnail)
 
-                view = KickLiveView(KICK_USERNAME)
+            content = (
+                f"<@&{LIVE_ROLE_ID}>\n"
+                f"<@{STREAMER_USER_ID}> is live right now!"
+            )
 
-                await channel.send(
-                    content=content,
-                    embed=embed,
-                    view=view
-                )
+            view = KickLiveView(KICK_USERNAME)
 
-                print("✅ Live notification sent", flush=True)
+            await channel.send(
+                content=content,
+                embed=embed,
+                view=view
+            )
+
+            print("✅ Live notification sent", flush=True)
 
         was_live = is_live
 
     except Exception as e:
         print(f"❌ Kick error: {e}", flush=True)
+
 
 
 @check_stream.before_loop
