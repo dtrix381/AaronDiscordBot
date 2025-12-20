@@ -3633,6 +3633,10 @@ PROXY_URL = f"https://aaronjay.dtrix381.workers.dev?u={KICK_API_URL}"
 
 was_live = False
 
+# ⏱️ Track stream stats
+stream_start_time = None
+peak_viewers = 0
+
 class KickLiveView(discord.ui.View):
     def __init__(self, kick_username: str):
         super().__init__(timeout=None)
@@ -3654,7 +3658,7 @@ def is_valid_image_url(url: str) -> bool:
     
 @tasks.loop(seconds=10)
 async def check_stream():
-    global was_live
+    global was_live, stream_start_time, peak_viewers
     print("⏱️ check_stream tick", flush=True)
 
     try:
@@ -3671,10 +3675,14 @@ async def check_stream():
         is_live = livestream is not None
         print(f"[Kick Check] live={is_live}", flush=True)
 
+        channel = bot.get_channel(DISCORD_CHANNEL_ID)
+        if not channel:
+            return
+
+        # 🔴 STREAM STARTED
         if is_live and not was_live:
-            channel = bot.get_channel(DISCORD_CHANNEL_ID)
-            if not channel:
-                return
+            stream_start_time = time.time()
+            peak_viewers = livestream.get("viewer_count", 0)
 
             title = livestream.get("session_title") or "Live on Kick!"
             thumbnail = livestream.get("thumbnail")
@@ -3686,32 +3694,56 @@ async def check_stream():
                 url=f"https://kick.com/{KICK_USERNAME}"
             )
 
-            # ✅ SAFE thumbnail handling
             if is_valid_image_url(thumbnail):
                 embed.set_thumbnail(url=thumbnail)
-            else:
-                embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1353382950300811394/1450100847357984799/Aaron_Jay.png?ex=69449ae7&is=69434967&hm=da5e8564c4370b1629f4ec0fc09880f6d0b05d71835c222811486b60be97c9f7")
 
             content = (
                 f"<@&{LIVE_ROLE_ID}>\n"
                 f"<@{STREAMER_USER_ID}> is live right now!"
             )
 
-            view = KickLiveView(KICK_USERNAME)
+            view = KickLiveView(KICK_USERNAME, "Watch Live on Kick")
 
-            await channel.send(
-                content=content,
-                embed=embed,
-                view=view
+            await channel.send(content=content, embed=embed, view=view)
+            print("✅ Live notification sent", flush=True)
+
+        # 📈 UPDATE PEAK VIEWERS WHILE LIVE
+        if is_live and was_live:
+            viewers = livestream.get("viewer_count", 0)
+            peak_viewers = max(peak_viewers, viewers)
+
+        # ⚫ STREAM ENDED
+        if not is_live and was_live:
+            duration = int(time.time() - stream_start_time) if stream_start_time else 0
+            minutes, seconds = divmod(duration, 60)
+
+            embed = discord.Embed(
+                title="🛑 Stream Ended",
+                description=(
+                    "Thank you everyone for hanging out with Aaron and watching the stream 💚\n\n"
+                    "We appreciate every single one of you for the support, laughs, and good vibes.\n"
+                    "See you all next stream 👋🔥\n\n"
+                    f"**📊 Stream Stats**\n"
+                    f"• ⏱ Duration: **{minutes}m {seconds}s**\n"
+                    f"• 👀 Peak Viewers: **{peak_viewers}**"
+                ),
+                color=discord.Color.dark_grey(),
+                url=f"https://kick.com/{KICK_USERNAME}"
             )
 
-            print("✅ Live notification sent", flush=True)
+            view = KickLiveView(KICK_USERNAME, "Watch Stream Replay")
+
+            await channel.send(embed=embed, view=view)
+            print("📴 Stream ended notification sent", flush=True)
+
+            # Reset stats
+            stream_start_time = None
+            peak_viewers = 0
 
         was_live = is_live
 
     except Exception as e:
         print(f"❌ Kick error: {e}", flush=True)
-
 
 
 @check_stream.before_loop
@@ -3720,7 +3752,7 @@ async def before_check_stream():
     await bot.wait_until_ready()
     print("✅ Bot ready, Kick checker allowed to run", flush=True)
 
-            
+
 # --- Define function first ---
 def get_affiliate_summary(date: str) -> dict:
     if not os.getenv("AFFILIATE_API_BASE") or not os.getenv("AFFILIATE_API_TOKEN"):
