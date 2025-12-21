@@ -3638,7 +3638,7 @@ stream_start_time = None
 peak_viewers = 0
 
 class KickLiveView(discord.ui.View):
-    def __init__(self, kick_username: str, button_label: str = "Watch Live on Kick"):
+    def __init__(self, kick_username: str, button_label: str = "Watch Aaron Live on Kick"):
         super().__init__(timeout=None)
 
         self.add_item(
