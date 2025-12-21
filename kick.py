@@ -3696,6 +3696,8 @@ async def check_stream():
 
             if is_valid_image_url(thumbnail):
                 embed.set_thumbnail(url=thumbnail)
+            else:
+                embed.set_image(url="https://cdn.discordapp.com/attachments/1353382950300811394/1450100847357984799/Aaron_Jay.png?ex=69488f67&is=69473de7&hm=9f0707bd0756ce264c5ef1bc4d7374957fc22468d8c5b66af08f223cbd1e5222")
 
             content = (
                 f"<@&{LIVE_ROLE_ID}>\n"
