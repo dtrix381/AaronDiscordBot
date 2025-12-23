@@ -3873,6 +3873,28 @@ async def referral_leaderboard(interaction: discord.Interaction):
 
     await interaction.followup.send(embed=embed)
 
+AUTO_MESSAGE = (
+    "@everyone\n\n"
+    "Don’t forget to reapply the code **AARONJAY** in the Rewards section so your wagering will be counted.\n"
+    "You need to reapply it every 7 days.\n\n"
+    "Current leaderboard:\n"
+    "https://acebet.com/affiliates/creator/aaronjay?leaderboardId=34"
+)
+
+LB_CHANNEL_ID = 1158852103863795723
+
+@tasks.loop(hours=24)
+async def auto_reminder():
+    channel = bot.get_channel(LB_CHANNEL_ID)
+    if channel is None:
+        channel = await bot.fetch_channel(LB_CHANNEL_ID)
+
+    await channel.send(AUTO_MESSAGE)
+
+@auto_reminder.before_loop
+async def before_auto_reminder():
+    await bot.wait_until_ready()
+        
 @bot.event
 async def on_ready():
     print("🤖 Bot ready — starting Kick checker", flush=True)
@@ -3957,6 +3979,9 @@ async def on_ready():
     if not check_stream.is_running():
         check_stream.start()
         print("▶️ Kick stream checker started")
+        
+    if not auto_reminder.is_running():
+        auto_reminder.start()
 
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
