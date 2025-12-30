@@ -3875,15 +3875,27 @@ async def referral_leaderboard(interaction: discord.Interaction):
 
 AUTO_MESSAGE = (
     "@everyone\n\n"
-    "Don’t forget to reapply the code **AARONJAY** in the Rewards section so your wagering will be counted.\n"
-    "You need to reapply it every 7 days.\n\n"
-    "Current leaderboard:\n"
-    "https://acebet.com/affiliates/creator/aaronjay?leaderboardId=34"
+    "💚 **THANK YOU FOR THE SUPPORT!** 💚\n\n"
+    "I just want to take a moment to say thank you to every single one of you for the insane support on stream.\n"
+    "It truly means the world to me and none of this would be possible without you legends 🙏\n\n"
+    "If you’d like to continue supporting the stream, you can do so by signing up or playing on our partner sites\n"
+    "using my codes below — it helps the channel out a ton and keeps everything going 🔥\n\n"
+    "🎰 **CASINO PARTNERS**\n"
+    "👉 **STAKE** — https://stake.com/?c=31ac5f9f9e\n"
+    "👉 **500 CASINO** — https://500.casino/r/AARONJAY\n"
+    "👉 **RAINBET** — https://rainbet.com/?r=aaronjay\n"
+    "👉 **DIMEBET** — https://dimebit.com/ref/aaronjay\n"
+    "👉 **DUEL** — https://duel.com/r/Aaron_jay\n\n"
+    "📲 **FOLLOW ME ON SOCIALS**\n"
+    "🐦 **Twitter/X** — https://x.com/AaronJaySpinz\n"
+    "📸 **Instagram** — https://www.instagram.com/aaron_jayonkick/\n\n"
+    "Every signup, follow, and bit of support helps grow the community 💚"
 )
+
 
 LB_CHANNEL_ID = 1158852103863795723
 
-@tasks.loop(hours=24)
+@tasks.loop(hours=168)
 async def auto_reminder():
     channel = bot.get_channel(LB_CHANNEL_ID)
     if channel is None:
@@ -3894,6 +3906,13 @@ async def auto_reminder():
 @auto_reminder.before_loop
 async def before_auto_reminder():
     await bot.wait_until_ready()
+
+    channel = bot.get_channel(LB_CHANNEL_ID)
+    if channel is None:
+        channel = await bot.fetch_channel(LB_CHANNEL_ID)
+
+    await channel.send(AUTO_MESSAGE)  # 👈 send immediately on startup
+
         
 @bot.event
 async def on_ready():
