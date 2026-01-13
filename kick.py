@@ -3913,7 +3913,73 @@ async def before_auto_reminder():
 
     await channel.send(AUTO_MESSAGE)  # 👈 send immediately on startup
 
+# All jokes
+JOKES = [
+    "Why don’t skeletons fight each other? They don’t have the guts.",
+    "I told my computer I needed a break… now it won’t stop sending me Kit-Kat ads.",
+    "Why did the scarecrow win an award? Because he was outstanding in his field.",
+    "I would tell you a UDP joke… but you might not get it.",
+    "Why do cows have hooves instead of feet? Because they lactose.",
+    "I’m reading a book about anti-gravity. It’s impossible to put down!",
+    "Why did the programmer quit his job? He didn’t get arrays.",
+    "Parallel lines have so much in common… it’s a shame they’ll never meet.",
+    "Why did the math book look sad? Because it had too many problems.",
+    "How do you organize a space party? You planet.",
+    "I tried to play poker at the casino… but the dealer said I was bluffing.",
+    "Roulette is just a wheel of misfortune if you’re broke.",
+    "Blackjack is like life… sometimes you hit 21, sometimes you bust.",
+    "I went to a casino and won a free meal… it was the appetizer to my debt.",
+    "Why did the gambler bring a ladder to the casino? He heard the stakes were high.",
+    "Slot machines are like exes… they take all your money and make noise when you don’t want them to.",
+    "Craps? I thought that was just my luck.",
+    "I asked the dealer for a loan… he said “I only deal in cards.”",
+    "Why don’t casinos sell clocks? They don’t want you to know how much time you’ve lost.",
+    "Poker is 90% luck and 10% knowing how to look serious when you lose.",
+    "Why did the poker player go to therapy? He couldn’t deal with his losses.",
+    "I lost at roulette… but hey, at least my depression isn’t evenly distributed.",
+    "What do you call a slot machine that tells jokes? Pun-atic.",
+    "Why did the gambler go broke? He put all his chips on himself.",
+    "I tried to gamble in the jungle… but the lions always cheated.",
+    "Why did the cookie go to the hospital? Because it felt crummy.",
+    "I told a joke about a roof… it went over everyone’s head.",
+    "Why can’t your nose be 12 inches long? Because then it would be a foot.",
+    "I told my dog a joke… now he’s a labracadabrador.",
+    "Why don’t eggs tell jokes? They’d crack each other up.",
+    "I ate a clock yesterday… it was very time-consuming.",
+    "How does a penguin build its house? Igloos it together.",
+    "I tried to play blackjack online… but my computer kept folding.",
+    "Casinos are the only place where losing your shirt is actually legal.",
+    "What do you call a gambler who cheats at cards? A “card shark” with a tiny paddle.",
+    "Slot machines are like relationships… sometimes you hit the jackpot, sometimes you get nothing."
+]
+
+# Create a queue and shuffle it
+joke_queue = JOKES.copy()
+random.shuffle(joke_queue)
+
+@tasks.loop(hours=8)
+async def send_jokes():
+    global joke_queue
+    channel = bot.get_channel(LB_CHANNEL_ID)
+    if channel is None:
+        channel = await bot.fetch_channel(LB_CHANNEL_ID)
+
+    # Pop a joke from the queue
+    joke = joke_queue.pop(0)
+    await channel.send(f"🎲 **Joke Time!** 🎲\n{joke}")
+
+    # If queue is empty, reshuffle
+    if not joke_queue:
+        joke_queue = JOKES.copy()
+        random.shuffle(joke_queue)
+        print("🔄 All jokes sent, reshuffling the queue.")
         
+@send_jokes.before_loop
+async def before_send_jokes():
+    await bot.wait_until_ready()
+    print("▶️ Joke loop ready, sending every 8 hours")
+
+
 @bot.event
 async def on_ready():
     print("🤖 Bot ready — starting Kick checker", flush=True)
@@ -4001,6 +4067,9 @@ async def on_ready():
         
     if not auto_reminder.is_running():
         auto_reminder.start()
+
+    if not send_jokes.is_running():
+        send_jokes.start()        
 
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
