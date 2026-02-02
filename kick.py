@@ -3957,7 +3957,7 @@ JOKES = [
 joke_queue = JOKES.copy()
 random.shuffle(joke_queue)
 
-@tasks.loop(hours=8)
+@tasks.loop(hours=48)
 async def send_jokes():
     global joke_queue
     channel = bot.get_channel(LB_CHANNEL_ID)
