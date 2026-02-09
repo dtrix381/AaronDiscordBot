@@ -380,27 +380,24 @@ CHEST_CARDS = [
 # ------------------ Database Setup ----------------
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS players (
-   INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
   username TEXT,
   coins INTEGER NOT NULL DEFAULT 0,
   position INTEGER NOT NULL DEFAULT 0,
   jailed_until INTEGER DEFAULT 0,
   last_roll INTEGER DEFAULT 0,
-  PRIMARY KEY (, user_id)
+  PRIMARY KEY (user_id)
 );
 
 CREATE TABLE IF NOT EXISTS properties (
-   INTEGER NOT NULL,
   idx INTEGER NOT NULL,
   owner_id INTEGER,
   mortgaged INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (, idx)
+  PRIMARY KEY (idx)
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-   INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
   amount INTEGER NOT NULL,
   reason TEXT,
@@ -408,16 +405,15 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 CREATE TABLE IF NOT EXISTS game_state (
-   INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY,
   bank_pool INTEGER NOT NULL DEFAULT 0
 );
 
--- 🔹 Giveaway table
 CREATE TABLE IF NOT EXISTS daily_giveaway (
-   INTEGER NOT NULL,
+  guild_id INTEGER NOT NULL,
   message_id INTEGER NOT NULL,
   giveaway_date TEXT NOT NULL,
-  PRIMARY KEY (, giveaway_date)
+  PRIMARY KEY (guild_id, giveaway_date)
 );
 """
 
