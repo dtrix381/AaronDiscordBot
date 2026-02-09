@@ -48,7 +48,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "images")
 BOARD_IMAGE_PATH = os.path.join(ASSETS_DIR, "monopoly_board.png")
 FONT_PATH = Path(__file__).parent / "fonts" / "Roboto-Bold.ttf"
-GUILD_ID = 1225022647432253512
+GUILD_ID = 1158852103268225104
 
 # ===================== DISCORD BOT =====================
 intents = discord.Intents.default()
