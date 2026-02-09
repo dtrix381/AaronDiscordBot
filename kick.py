@@ -28,6 +28,8 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pathlib import Path
 import sys
+from bs4 import BeautifulSoup
+import xml.etree.ElementTree as ET
 
 # Load .env file locally
 load_dotenv()
@@ -71,22 +73,26 @@ def choose_dice_for_total(total: int) -> Optional[Tuple[int, int]]:
 
 REDEEM_THRESHOLD = 10000
 STARTING_COINS = 1500
-REDEEM_CHANNEL_ID = 1419702679533523026  # 🔹 Change this to your announcement channel ID
+REDEEM_CHANNEL_ID = 1419702679533523026  
 ROLL_COOLDOWN_HOURS = 4
 ROLL_COOLDOWN_SECONDS = ROLL_COOLDOWN_HOURS * 3600
-TURN_DECISION_TIMEOUT = 60  # seconds for Buy/Pass
+TURN_DECISION_TIMEOUT = 60  
 TAX_ANNOUNCE_CHANNEL_ID = 1419651787559796807
 MONOPOLY_TRANSACTIONS_CHANNEL_ID = 1419653557774323763
 GLOBAL_ROLL_LOCK = asyncio.Lock()
 ADMIN_ID = 488015447417946151
 GIVEAWAY_CHANNEL_ID = 1419644877712396339
-ROLL_CHANNEL_ID = 1419646214848385106  # dedicated channel for monopoly rolls
+ROLL_CHANNEL_ID = 1419646214848385106  
 ELIGIBLE_ROLE_ID = 1419593812501594195
 WINNERS_COUNT = 5
 LOG_CHANNEL_ID = 1419655999538597929
 ALLOWED_CHANNEL_IDS = [1283632002322530314]
 API_BASE = os.getenv("AFFILIATE_API_BASE")
 API_TOKEN = os.getenv("AFFILIATE_API_TOKEN")
+GUILD_ID = 1225022647432253512
+POLITE_DELAY = (1.0, 2.5)  
+ASK_CHANNEL_ID = 1470361281285324821
+CALL_CHANNEL_ID = 1470361355105075366
 
 # Load Kick OAuth token
 KICK_TOKEN_PATH = "kick_token.json"
@@ -373,27 +379,27 @@ CHEST_CARDS = [
 # ------------------ Database Setup ----------------
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS players (
-  guild_id INTEGER NOT NULL,
+   INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
   username TEXT,
   coins INTEGER NOT NULL DEFAULT 0,
   position INTEGER NOT NULL DEFAULT 0,
   jailed_until INTEGER DEFAULT 0,
   last_roll INTEGER DEFAULT 0,
-  PRIMARY KEY (guild_id, user_id)
+  PRIMARY KEY (, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS properties (
-  guild_id INTEGER NOT NULL,
+   INTEGER NOT NULL,
   idx INTEGER NOT NULL,
   owner_id INTEGER,
   mortgaged INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (guild_id, idx)
+  PRIMARY KEY (, idx)
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  guild_id INTEGER NOT NULL,
+   INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
   amount INTEGER NOT NULL,
   reason TEXT,
@@ -401,16 +407,16 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 CREATE TABLE IF NOT EXISTS game_state (
-  guild_id INTEGER PRIMARY KEY,
+   INTEGER PRIMARY KEY,
   bank_pool INTEGER NOT NULL DEFAULT 0
 );
 
 -- 🔹 Giveaway table
 CREATE TABLE IF NOT EXISTS daily_giveaway (
-  guild_id INTEGER NOT NULL,
+   INTEGER NOT NULL,
   message_id INTEGER NOT NULL,
   giveaway_date TEXT NOT NULL,
-  PRIMARY KEY (guild_id, giveaway_date)
+  PRIMARY KEY (, giveaway_date)
 );
 """
 
@@ -698,7 +704,7 @@ def human_now() -> int:
 async def get_db():
     return await aiosqlite.connect(DB_PATH)
 
-async def ensure_guild_state(guild_id: int):
+async def ensure_guild_state(: int):
     db = await get_db()
     try:
         await db.execute(
@@ -3980,6 +3986,462 @@ async def before_send_jokes():
     print("▶️ Joke loop ready, sending every 8 hours")
 
 
+NS = {'s': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+
+# ====== FETCH ======
+def get_existing_slot_urls():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT url FROM slots")
+    urls = {row[0] for row in c.fetchall()}  # set for fast lookup
+    conn.close()
+    return urls
+
+def get_all_slot_urls():
+    """Fetch all /free-slots/ URLs from sitemap, skipping URLs already in DB"""
+    sitemap_index_url = "https://www.demoslot.com/wp-sitemap.xml"
+    response = requests.get(sitemap_index_url)
+    if response.status_code != 200:
+        print("Failed to download sitemap index")
+        return []
+
+    root_index = ET.fromstring(response.text)
+    sub_sitemaps = [s.find('s:loc', NS).text for s in root_index.findall('s:sitemap', NS)]
+
+    existing_urls = get_existing_slot_urls()
+    slot_urls = []
+
+    for sm_url in sub_sitemaps:
+        try:
+            res = requests.get(sm_url)
+            sm_root = ET.fromstring(res.text)
+            for loc in sm_root.findall('s:url/s:loc', NS):
+                url = loc.text
+                if '/free-slots/' in url and url not in existing_urls:
+                    slot_urls.append(url)
+        except Exception as e:
+            print(f"Error fetching sitemap {sm_url}: {e}")
+
+    print(f"Found {len(slot_urls)} new slot URLs to scrape ✅")
+    return slot_urls
+
+
+def fetch_page(url):
+    """Fetch HTML content with retries"""
+    for _ in range(3):
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                return r.text
+            else:
+                print(f"Status code {r.status_code} for {url}")
+        except Exception as e:
+            print(f"Retrying {url} due to error: {e}")
+        time.sleep(2)
+    return None
+
+
+# ====== CLEAN NAME ======
+def clean_slot_name(name):
+    """Remove unwanted words from slot names"""
+    unwanted_phrases = ["Demo", "Free Play", "Slot", "Free Slot"]
+    for phrase in unwanted_phrases:
+        name = name.replace(phrase, "")
+    # Clean extra spaces and parentheses
+    name = name.strip()
+    name = name.replace("()", "")
+    return name
+
+
+# ====== PARSE SLOT ======
+def parse_slot(slot_url):
+    """Parse individual slot page"""
+    html = fetch_page(slot_url)
+    if not html:
+        return None
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Name
+    name_tag = soup.find("h1")
+    name_span = name_tag.find("span", class_="notranslate") if name_tag else None
+    raw_name = name_span.get_text(strip=True) if name_span else (
+        name_tag.get_text(strip=True) if name_tag else "Unknown")
+    name = clean_slot_name(raw_name)
+
+    # Provider
+    provider_tag = soup.find("td", string="Provider")
+    if provider_tag:
+        provider = provider_tag.find_next_sibling("td").get_text(strip=True)
+    else:
+        figcap = soup.find("figcaption")
+        provider_span = figcap.find("span") if figcap else None
+        provider = provider_span.get_text(strip=True) if provider_span else "Unknown"
+
+    # Thumbnail
+    thumb_tag = soup.find("div", id="slot-demo")
+    if thumb_tag and thumb_tag.get("data-bg-image"):
+        thumbnail = thumb_tag["data-bg-image"].replace("url('", "").replace("')", "")
+    else:
+        og_image = soup.find("meta", property="og:image")
+        thumbnail = og_image.get("content") if og_image else ""
+
+    return {"name": name, "url": slot_url, "provider": provider, "thumbnail": thumbnail}
+
+
+def update_db(slot_data):
+    """Insert or update a slot in the DB"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO slots (name, provider, url, thumbnail)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(url) DO UPDATE SET
+            name=excluded.name,
+            provider=excluded.provider,
+            thumbnail=excluded.thumbnail,
+            updated_at=CURRENT_TIMESTAMP
+    """, (slot_data["name"], slot_data["provider"], slot_data["url"], slot_data["thumbnail"]))
+    conn.commit()
+    conn.close()
+
+# ====== MAIN SCRAPER ======
+def scrape_and_update():
+    print("Fetching all slot URLs from sitemap...")
+    slot_urls = get_all_slot_urls()
+    print(f"Found {len(slot_urls)} slots to add/update.")
+
+    for index, url in enumerate(slot_urls, 1):
+        slot_data = parse_slot(url)
+        if slot_data:
+            update_db(slot_data)
+            print(f"[{index}/{len(slot_urls)}] Added/Updated: {slot_data['name']} ({slot_data['provider']})")
+        time.sleep(random.uniform(*POLITE_DELAY))
+
+    print("Scraping complete.")
+
+def increment_provider_usage(provider):
+
+    if provider == "ALL":
+        return  # don't track ALL
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    c.execute("""
+        INSERT INTO provider_usage (provider, usage_count)
+        VALUES (?, 1)
+        ON CONFLICT(provider)
+        DO UPDATE SET usage_count = usage_count + 1
+    """, (provider,))
+
+    conn.commit()
+    conn.close()
+
+async def provider_autocomplete(interaction: discord.Interaction, current: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    c.execute("""
+        SELECT s.provider,
+               COALESCE(u.usage_count, 0) as usage_count,
+               COUNT(slots.url) AS total_slots
+        FROM (
+            SELECT DISTINCT provider FROM slots
+        ) s
+        LEFT JOIN provider_usage u
+            ON s.provider = u.provider
+        LEFT JOIN slots
+            ON slots.provider = s.provider
+        WHERE s.provider LIKE ?
+        GROUP BY s.provider
+        ORDER BY usage_count DESC, total_slots DESC, s.provider ASC
+        LIMIT 25
+    """, (f"%{current}%",))
+
+    providers = [row[0] for row in c.fetchall()]
+    conn.close()
+
+    choices = [app_commands.Choice(name="All Providers", value="ALL")]
+
+    for p in providers:
+        choices.append(app_commands.Choice(name=p, value=p))
+
+    return choices[:25]
+
+
+class ProviderView(discord.ui.View):
+    def __init__(self, providers):
+        super().__init__(timeout=60)
+        self.add_item(ProviderSelect(providers))
+
+
+async def send_random_slot(interaction, provider_value):
+
+    # Track usage
+    increment_provider_usage(provider_value)
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    if provider_value == "ALL":
+        c.execute("""
+            SELECT name, provider, url, thumbnail
+            FROM slots
+        """)
+    else:
+        c.execute("""
+            SELECT name, provider, url, thumbnail
+            FROM slots
+            WHERE provider = ?
+        """, (provider_value,))
+
+    rows = c.fetchall()
+    conn.close()
+
+    if not rows:
+        await interaction.response.send_message(
+            "No slots found for that provider.",
+            ephemeral=True
+        )
+        return
+
+    name, provider, url, thumbnail = random.choice(rows)
+
+    embed = discord.Embed(
+        title=name,
+        description=f"Provider: **{provider}**",
+        color=discord.Color.blue()
+    )
+
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+
+    embed.set_footer(
+        text="⚠️ Gamble responsibly. This bot is for entertainment purposes only. Use at your own discretion."
+    )
+
+    await interaction.response.send_message(
+        content=f"{interaction.user.mention} Here’s your random slot!",
+        embed=embed
+    )
+
+def get_providers_by_usage(limit=24):
+    """
+    Return providers for the top select menu.
+    Prioritize usage_count, fallback to total slots.
+    Always include providers even if usage=0.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    c.execute("""
+        SELECT s.provider,
+               COALESCE(u.usage_count, 0) AS usage_count,
+               COUNT(slots.url) AS total_slots
+        FROM (
+            SELECT DISTINCT provider FROM slots
+        ) s
+        LEFT JOIN provider_usage u
+            ON s.provider = u.provider
+        LEFT JOIN slots
+            ON slots.provider = s.provider
+        GROUP BY s.provider
+        ORDER BY usage_count DESC, total_slots DESC, s.provider ASC
+        LIMIT ?
+    """, (limit,))
+
+    providers = [row[0] for row in c.fetchall()]
+    conn.close()
+    return providers
+
+
+class ProviderSelect(discord.ui.Select):
+    def __init__(self, providers):
+        options = [
+            discord.SelectOption(
+                label="All Providers",
+                value="ALL",
+                description="Pick from all providers"
+            )
+        ]
+
+        # Add top providers by usage
+        for p in providers:
+            options.append(
+                discord.SelectOption(
+                    label=p,
+                    value=p
+                )
+            )
+
+        super().__init__(
+            placeholder="Quick pick provider...",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await send_random_slot(interaction, self.values[0])
+
+
+@bot.tree.command(name="random_slot", description="Pick a random slot", guild=guild)
+@app_commands.describe(provider="Select or type a provider")
+@app_commands.autocomplete(provider=provider_autocomplete)
+async def random_slot(interaction: discord.Interaction, provider: str):
+    if interaction.channel_id != ASK_CHANNEL_ID:
+        await interaction.response.send_message(
+            f"⚠️ You can’t use that command here! Please go to <#{ASK_CHANNEL_ID}> to use `/random_slot`.",
+            ephemeral=True
+        )
+        return
+
+    # Fetch top providers for menu
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    providers = get_providers_by_usage()
+    conn.close()
+
+    # If user typed provider → send immediately
+    if provider:
+        await send_random_slot(interaction, provider)
+        return
+
+    # Otherwise show select menu
+    await interaction.response.send_message(
+        "Quick pick a provider below or type one:",
+        view=ProviderView(providers),
+        ephemeral=True
+    )
+
+# ================= SLOT CALL COMMAND =================
+
+def get_top_slots(limit=25):
+    """Return top slots by usage_count from the DB"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        SELECT s.name, s.provider, s.url, s.thumbnail, COALESCE(u.usage_count, 0) as usage_count
+        FROM slots s
+        LEFT JOIN slot_usage u
+            ON s.name = u.slot_name
+        ORDER BY usage_count DESC, s.name ASC
+        LIMIT ?
+    """, (limit,))
+    slots = c.fetchall()
+    conn.close()
+    return slots
+
+async def slot_autocomplete(interaction: discord.Interaction, current: str):
+    """Autocomplete for slot names"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        SELECT s.name, s.provider
+        FROM slots s
+        LEFT JOIN slot_usage u
+            ON s.name = u.slot_name
+        WHERE s.name LIKE ?
+        ORDER BY COALESCE(u.usage_count, 0) DESC, s.name ASC
+        LIMIT 25
+    """, (f"%{current}%",))
+    slots = [f"{row[0]} - {row[1]}" for row in c.fetchall()]
+    conn.close()
+
+    return [
+        app_commands.Choice(name=slot, value=slot)
+        for slot in slots
+    ]
+
+def increment_slot_usage(slot_name):
+    """Track how many times each slot was called"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS slot_usage (
+            slot_name TEXT PRIMARY KEY,
+            usage_count INTEGER DEFAULT 0
+        )
+    """)
+    c.execute("""
+        INSERT INTO slot_usage (slot_name, usage_count)
+        VALUES (?, 1)
+        ON CONFLICT(slot_name)
+        DO UPDATE SET usage_count = usage_count + 1
+    """, (slot_name,))
+    conn.commit()
+    conn.close()
+
+async def send_slot_call(interaction: discord.Interaction, slot_value: str):
+    """Send the slot call embed"""
+    slot_name, provider = slot_value.split(" - ", 1)
+
+    # Increment usage
+    increment_slot_usage(slot_name)
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        SELECT url, thumbnail
+        FROM slots
+        WHERE name = ? AND provider = ?
+    """, (slot_name, provider))
+    row = c.fetchone()
+    conn.close()
+
+    url, thumbnail = row if row else ("", "")
+
+    embed = discord.Embed(
+        title=slot_name,
+        description=f"Provider: **{provider}**",
+        color=discord.Color.green()
+    )
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+    embed.set_footer(text="⚠️ Gamble responsibly. For entertainment purposes only.")
+
+    await interaction.response.send_message(
+        content=f"{interaction.user.mention} calls **{slot_name}**!",
+        embed=embed
+    )
+
+
+# ================= DISCORD COMMAND =================
+@bot.tree.command(
+    name="slot_call",
+    description="Call a slot from the top slots",
+    guild=guild
+)
+@app_commands.describe(slot="Pick a slot to call")
+@app_commands.autocomplete(slot=slot_autocomplete)
+async def slot_call(interaction: discord.Interaction, slot: str):
+
+    if interaction.channel_id != CALL_CHANNEL_ID:
+        await interaction.response.send_message(
+            f"⚠️ You can’t use that command here! Please go to <#{CALL_CHANNEL_ID}> to use `/slot_call`.",
+            ephemeral=True
+        )
+        return
+    await send_slot_call(interaction, slot)
+
+
+async def background_scrape():
+    await asyncio.sleep(1)  # small delay
+    print("Starting background scraping...")
+    slot_urls = get_all_slot_urls()  # uses DB-skipping version
+    print(f"Found {len(slot_urls)} new slots to scrape.")
+
+    for index, url in enumerate(slot_urls, 1):
+        slot_data = parse_slot(url)
+        if slot_data:
+            update_db(slot_data)
+            print(f"[{index}/{len(slot_urls)}] Added/Updated: {slot_data['name']} ({slot_data['provider']})")
+        await asyncio.sleep(random.uniform(*POLITE_DELAY))
+
+    print("Background scraping complete.")
+
 @bot.event
 async def on_ready():
     print("🤖 Bot ready — starting Kick checker", flush=True)
@@ -4069,8 +4531,10 @@ async def on_ready():
         auto_reminder.start()
 
     if not send_jokes.is_running():
-        send_jokes.start()        
+        send_jokes.start()
 
+    bot.loop.create_task(background_scrape())
+    
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
     
@@ -4078,7 +4542,33 @@ async def load_extensions():
 async def on_message(message: discord.Message):
     if message.author.bot:
         return
+  
+    # Only enforce for messages in the restricted channels
+    if message.channel.id == ASK_CHANNEL_ID:
+        # Check if the message is not invoking /random_slot
+        if not message.content.startswith("/random_slot"):
+            try:
+                await message.delete()
+                await message.channel.send(
+                    f"{message.author.mention}, you can only use `/random_slot` in this channel!",
+                    delete_after=5  # auto-delete the warning after 5 seconds
+                )
+            except discord.Forbidden:
+                print("Missing permissions to delete message")
+            return  # stop processing further
 
+    elif message.channel.id == CALL_CHANNEL_ID:
+        if not message.content.startswith("/slot_call"):
+            try:
+                await message.delete()
+                await message.channel.send(
+                    f"{message.author.mention}, you can only use `/slot_call` in this channel!",
+                    delete_after=5
+                )
+            except discord.Forbidden:
+                print("Missing permissions to delete message")
+            return
+            
     # ✅ Kick username verification
     if message.channel.id == 1419716547643052042:
         new_nick = message.content.strip()
