@@ -30,6 +30,7 @@ from pathlib import Path
 import sys
 from bs4 import BeautifulSoup
 import xml.etree.ElementTree as ET
+import sqlite3
 
 # Load .env file locally
 load_dotenv()
