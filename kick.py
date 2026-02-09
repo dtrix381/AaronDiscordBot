@@ -4284,7 +4284,7 @@ class ProviderSelect(discord.ui.Select):
         await send_random_slot(interaction, self.values[0])
 
 
-@bot.tree.command(name="random_slot", description="Pick a random slot", guild=guild)
+@bot.tree.command(name="random_slot", description="Pick a random slot")
 @app_commands.describe(provider="Select or type a provider")
 @app_commands.autocomplete(provider=provider_autocomplete)
 async def random_slot(interaction: discord.Interaction, provider: str):
@@ -4409,9 +4409,7 @@ async def send_slot_call(interaction: discord.Interaction, slot_value: str):
 # ================= DISCORD COMMAND =================
 @bot.tree.command(
     name="slot_call",
-    description="Call a slot from the top slots",
-    guild=guild
-)
+    description="Call a slot from the top slots")
 @app_commands.describe(slot="Pick a slot to call")
 @app_commands.autocomplete(slot=slot_autocomplete)
 async def slot_call(interaction: discord.Interaction, slot: str):
