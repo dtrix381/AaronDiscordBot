@@ -704,7 +704,7 @@ def human_now() -> int:
 async def get_db():
     return await aiosqlite.connect(DB_PATH)
 
-async def ensure_guild_state(: int):
+async def ensure_guild_state(guild_id: int):
     db = await get_db()
     try:
         await db.execute(
