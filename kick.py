@@ -48,6 +48,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "images")
 BOARD_IMAGE_PATH = os.path.join(ASSETS_DIR, "monopoly_board.png")
 FONT_PATH = Path(__file__).parent / "fonts" / "Roboto-Bold.ttf"
+GUILD_ID = 1225022647432253512
 
 # ===================== DISCORD BOT =====================
 intents = discord.Intents.default()
@@ -90,7 +91,6 @@ LOG_CHANNEL_ID = 1419655999538597929
 ALLOWED_CHANNEL_IDS = [1283632002322530314]
 API_BASE = os.getenv("AFFILIATE_API_BASE")
 API_TOKEN = os.getenv("AFFILIATE_API_TOKEN")
-GUILD_ID = 1225022647432253512
 POLITE_DELAY = (1.0, 2.5)  
 ASK_CHANNEL_ID = 1470361281285324821
 CALL_CHANNEL_ID = 1470361355105075366
