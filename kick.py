@@ -57,6 +57,7 @@ intents.message_content = True
 intents.messages = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
+guild = discord.Object(id=GUILD_ID)
 
 # --- Testing cheat: force next roll ---
 # maps guild_id -> (d1, d2) or guild_id -> total (we will store (d1,d2))
