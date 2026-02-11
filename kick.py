@@ -4405,6 +4405,30 @@ async def send_slot_call(interaction: discord.Interaction, slot_value: str):
         embed=embed
     )
 
+# 🔄 AUTO SLOT SCRAPER LOOP
+@tasks.loop(hours=24)  # change interval if you want
+async def auto_scrape_slots():
+    print("🔄 Auto scraping slots...")
+
+    slot_urls = get_all_slot_urls()
+    print(f"Found {len(slot_urls)} new slots to scrape.")
+
+    for index, url in enumerate(slot_urls, 1):
+        slot_data = parse_slot(url)
+
+        if slot_data:
+            update_db(slot_data)
+            print(f"[{index}/{len(slot_urls)}] Added/Updated: {slot_data['name']} ({slot_data['provider']})")
+
+        await asyncio.sleep(random.uniform(*POLITE_DELAY))
+
+    print("✅ Auto scrape cycle complete.")
+
+# Wait until bot is ready before first run
+@auto_scrape_slots.before_loop
+async def before_auto_scrape():
+    await bot.wait_until_ready()
+    print("⏳ Auto slot scraper waiting for bot ready...")
 
 # ================= DISCORD COMMAND =================
 @bot.tree.command(
@@ -4529,7 +4553,9 @@ async def on_ready():
     if not send_jokes.is_running():
         send_jokes.start()
 
-    bot.loop.create_task(background_scrape())
+    if not auto_scrape_slots.is_running():
+        auto_scrape_slots.start()
+        print("▶️ Auto slot scraper started (6h loop)")
     
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
