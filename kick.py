@@ -3260,8 +3260,8 @@ async def monopoly_roll(interaction: discord.Interaction):
                     file=discord.File(buf, filename="monopoly_board.png")
                 )
 
-            except discord.errors.NotFound:
-            print(f"[WARN] Interaction expired for user {interaction.user.id}")
+    except discord.errors.NotFound:
+        print(f"[WARN] Interaction expired for user {interaction.user.id}")
 
 
 @bot.tree.command(name="give_roll", description="(Admin) Give extra free rolls to a player.")
