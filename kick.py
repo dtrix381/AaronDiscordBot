@@ -65,34 +65,43 @@ guild = discord.Object(id=GUILD_ID)
 # maps guild_id -> (d1, d2) or guild_id -> total (we will store (d1,d2))
 FORCED_NEXT_ROLL: Dict[int, Tuple[int, int]] = {}
 
+
 def choose_dice_for_total(total: int) -> Optional[Tuple[int, int]]:
     """Return a random dice pair (d1,d2) with 1<=d<=6 that sums to total.
        If impossible, return None.
     """
-    pairs = [(a,b) for a in range(1,7) for b in range(1,7) if a + b == total]
+    pairs = [(a, b) for a in range(1, 7) for b in range(1, 7) if a + b == total]
     if not pairs:
         return None
     return random.choice(pairs)
 
+
 REDEEM_THRESHOLD = 10000
 STARTING_COINS = 1500
-REDEEM_CHANNEL_ID = 1419702679533523026  
 ROLL_COOLDOWN_HOURS = 4
 ROLL_COOLDOWN_SECONDS = ROLL_COOLDOWN_HOURS * 3600
-TURN_DECISION_TIMEOUT = 60  
+TURN_DECISION_TIMEOUT = 60
 TAX_ANNOUNCE_CHANNEL_ID = 1419651787559796807
-MONOPOLY_TRANSACTIONS_CHANNEL_ID = 1419653557774323763
 GLOBAL_ROLL_LOCK = asyncio.Lock()
 ADMIN_ID = 488015447417946151
-GIVEAWAY_CHANNEL_ID = 1419644877712396339
-ROLL_CHANNEL_ID = 1419646214848385106  
+JOIN_CHANNEL_ID = None
+GIVEAWAY_CHANNEL_ID = None
+ROLL_CHANNEL_ID = None
+ROLLS_HISTORY_CHANNEL_ID = None
+MONOPOLY_TRANSACTIONS_CHANNEL_ID = None
+TAX_CHANNEL_ID = None
+REDEEM_CHANNEL_ID = None
+RULES_CHANNEL_ID = None
+COMMANDS_CHANNEL_ID = None
+MONOPOLY_ROLE_ID = None
+LOG_CHANNEL_ID = None
 ELIGIBLE_ROLE_ID = 1419593812501594195
 WINNERS_COUNT = 5
 LOG_CHANNEL_ID = 1419655999538597929
 ALLOWED_CHANNEL_IDS = [1283632002322530314]
 API_BASE = os.getenv("AFFILIATE_API_BASE")
 API_TOKEN = os.getenv("AFFILIATE_API_TOKEN")
-POLITE_DELAY = (1.0, 2.5)  
+POLITE_DELAY = (1.0, 2.5)
 ASK_CHANNEL_ID = 1470361281285324821
 CALL_CHANNEL_ID = 1470361355105075366
 
@@ -105,9 +114,17 @@ if os.path.exists(KICK_TOKEN_PATH):
         data = json.load(f)
         KICK_OAUTH_TOKEN = data.get("access_token")
 
-# Store the latest giveaway message so we can track reactions
 current_giveaway_msg_id = None
 ACTIVE_GIVEAWAYS = {}
+
+ALLOWED_COMMANDS = [
+    "give_roll",
+    "jail",
+    "monopoly_profile",
+    "monopoly_leaderboard",
+    "monopoly_board",
+    "rumble_start"
+]
 
 # Colors
 BOARD_BG = (18, 20, 24)
@@ -130,48 +147,76 @@ GROUP_COLORS = {
 
 SLOT_BOARD: List[Dict] = [
     {"idx": 0, "type": "go", "name": "GO! Start Spinning", "image": "images/0.png"},
-    {"idx": 1, "type": "property", "name": "RIP City", "price": 100, "rent": 15, "group": "brown", "image": "images/1.png"},
+    {"idx": 1, "type": "property", "name": "RIP City", "price": 100, "rent": 15, "group": "brown",
+     "image": "images/1.png"},
     {"idx": 2, "type": "chest", "name": "Bonus Chest", "image": "images/2.png"},
-    {"idx": 3, "type": "property", "name": "The Dog House", "price": 90, "rent": 13.5, "group": "brown", "image": "images/3.png"},
+    {"idx": 3, "type": "property", "name": "The Dog House", "price": 90, "rent": 13.5, "group": "brown",
+     "image": "images/3.png"},
     {"idx": 4, "type": "tax", "name": "Dead Spin Deduction", "amount": 200, "image": "images/4.png"},
-    {"idx": 5, "type": "provider", "name": "Pragmatic Play", "price": 200, "rent": 25, "group": "provider", "image": "images/5.png"},
-    {"idx": 6, "type": "property", "name": "Wild West Gold", "price": 130, "rent": 20.8, "group": "lightblue", "image": "images/6.png"},
+    {"idx": 5, "type": "provider", "name": "Pragmatic Play", "price": 200, "rent": 25, "group": "provider",
+     "image": "images/5.png"},
+    {"idx": 6, "type": "property", "name": "Wild West Gold", "price": 130, "rent": 20.8, "group": "lightblue",
+     "image": "images/6.png"},
     {"idx": 7, "type": "gamble", "name": "Bonus Gamble", "image": "images/7.png"},
-    {"idx": 8, "type": "property", "name": "Chaos Crew", "price": 120, "rent": 18, "group": "lightblue", "image": "images/8.png"},
-    {"idx": 9, "type": "property", "name": "Toshi Video Club", "price": 100, "rent": 15, "group": "lightblue", "image": "images/9.png"},
+    {"idx": 8, "type": "property", "name": "Chaos Crew", "price": 120, "rent": 18, "group": "lightblue",
+     "image": "images/8.png"},
+    {"idx": 9, "type": "property", "name": "Toshi Video Club", "price": 100, "rent": 15, "group": "lightblue",
+     "image": "images/9.png"},
 
     {"idx": 10, "type": "jail", "name": "San Quentin Xways Jail", "image": "images/10.png"},
-    {"idx": 11, "type": "property", "name": "Gates of Olympus", "price": 180, "rent": 30.6, "group": "pink", "image": "images/11.png"},
-    {"idx": 12, "type": "utility", "name": "Money Train", "price": 150, "rent": 4, "group": "utility", "image": "images/12.png"},
-    {"idx": 13, "type": "property", "name": "Zombie School Megaways", "price": 200, "rent": 30, "group": "pink", "image": "images/13.png"},
-    {"idx": 14, "type": "property", "name": "Gemhalla", "price": 170, "rent": 27.2, "group": "pink", "image": "images/14.png"},
-    {"idx": 15, "type": "provider", "name": "Hacksaw Gaming", "price": 200, "rent": 25, "group": "provider", "image": "images/15.png"},
-    {"idx": 16, "type": "property", "name": "Deadwood R.I.P", "price": 190, "rent": 28.5, "group": "orange", "image": "images/16.png"},
+    {"idx": 11, "type": "property", "name": "Gates of Olympus", "price": 180, "rent": 30.6, "group": "pink",
+     "image": "images/11.png"},
+    {"idx": 12, "type": "utility", "name": "Money Train", "price": 150, "rent": 4, "group": "utility",
+     "image": "images/12.png"},
+    {"idx": 13, "type": "property", "name": "Zombie School Megaways", "price": 200, "rent": 30, "group": "pink",
+     "image": "images/13.png"},
+    {"idx": 14, "type": "property", "name": "Gemhalla", "price": 170, "rent": 27.2, "group": "pink",
+     "image": "images/14.png"},
+    {"idx": 15, "type": "provider", "name": "Hacksaw Gaming", "price": 200, "rent": 25, "group": "provider",
+     "image": "images/15.png"},
+    {"idx": 16, "type": "property", "name": "Deadwood R.I.P", "price": 190, "rent": 28.5, "group": "orange",
+     "image": "images/16.png"},
     {"idx": 17, "type": "chest", "name": "Bonus Chest", "image": "images/17.png"},
-    {"idx": 18, "type": "property", "name": "Gates of Hades", "price": 180, "rent": 27, "group": "orange", "image": "images/18.png"},
-    {"idx": 19, "type": "property", "name": "Dragon's Domain", "price": 160, "rent": 24, "group": "orange", "image": "images/19.png"},
+    {"idx": 18, "type": "property", "name": "Gates of Hades", "price": 180, "rent": 27, "group": "orange",
+     "image": "images/18.png"},
+    {"idx": 19, "type": "property", "name": "Dragon's Domain", "price": 160, "rent": 24, "group": "orange",
+     "image": "images/19.png"},
 
     {"idx": 20, "type": "free", "name": "Safe Spin Zone", "image": "images/20.png"},
-    {"idx": 21, "type": "property", "name": "Club Tropicana", "price": 250, "rent": 45, "group": "red", "image": "images/21.png"},
+    {"idx": 21, "type": "property", "name": "Club Tropicana", "price": 250, "rent": 45, "group": "red",
+     "image": "images/21.png"},
     {"idx": 22, "type": "gamble", "name": "Bonus Gamble", "image": "images/22.png"},
-    {"idx": 23, "type": "property", "name": "Gates of Valhalla", "price": 220, "rent": 33, "group": "red", "image": "images/23.png"},
-    {"idx": 24, "type": "property", "name": "Sweet Kingdom", "price": 210, "rent": 33.6, "group": "red", "image": "images/24.png"},
-    {"idx": 25, "type": "provider", "name": "NoLimit City", "price": 200, "rent": 25, "group": "provider", "image": "images/25.png"},
-    {"idx": 26, "type": "property", "name": "Temple Tumble", "price": 200, "rent": 36, "group": "yellow", "image": "images/26.png"},
-    {"idx": 27, "type": "property", "name": "Cursed Seas", "price": 220, "rent": 39.6, "group": "yellow", "image": "images/27.png"},
-    {"idx": 28, "type": "utility", "name": "Mental", "price": 150, "rent": 4, "group": "utility", "image": "images/28.png"},
-    {"idx": 29, "type": "property", "name": "Fighter Pit", "price": 240, "rent": 40.8, "group": "yellow", "image": "images/29.png"},
+    {"idx": 23, "type": "property", "name": "Gates of Valhalla", "price": 220, "rent": 33, "group": "red",
+     "image": "images/23.png"},
+    {"idx": 24, "type": "property", "name": "Sweet Kingdom", "price": 210, "rent": 33.6, "group": "red",
+     "image": "images/24.png"},
+    {"idx": 25, "type": "provider", "name": "NoLimit City", "price": 200, "rent": 25, "group": "provider",
+     "image": "images/25.png"},
+    {"idx": 26, "type": "property", "name": "Temple Tumble", "price": 200, "rent": 36, "group": "yellow",
+     "image": "images/26.png"},
+    {"idx": 27, "type": "property", "name": "Cursed Seas", "price": 220, "rent": 39.6, "group": "yellow",
+     "image": "images/27.png"},
+    {"idx": 28, "type": "utility", "name": "Mental", "price": 150, "rent": 4, "group": "utility",
+     "image": "images/28.png"},
+    {"idx": 29, "type": "property", "name": "Fighter Pit", "price": 240, "rent": 40.8, "group": "yellow",
+     "image": "images/29.png"},
 
     {"idx": 30, "type": "gotojail", "name": "Go To San Quentin Jail", "image": "images/30.png"},
-    {"idx": 31, "type": "property", "name": "Brick House Bonanza", "price": 320, "rent": 60.8, "group": "green", "image": "images/31.png"},
-    {"idx": 32, "type": "property", "name": "Zombie Carnival", "price": 300, "rent": 51, "group": "green", "image": "images/32.png"},
+    {"idx": 31, "type": "property", "name": "Brick House Bonanza", "price": 320, "rent": 60.8, "group": "green",
+     "image": "images/31.png"},
+    {"idx": 32, "type": "property", "name": "Zombie Carnival", "price": 300, "rent": 51, "group": "green",
+     "image": "images/32.png"},
     {"idx": 33, "type": "chest", "name": "Bonus Chest", "image": "images/33.png"},
-    {"idx": 34, "type": "property", "name": "Devil's Crossroad", "price": 310, "rent": 55.8, "group": "green", "image": "images/34.png"},
-    {"idx": 35, "type": "provider", "name": "B Gaming", "price": 200, "rent": 25, "group": "provider", "image": "images/35.png"},
+    {"idx": 34, "type": "property", "name": "Devil's Crossroad", "price": 310, "rent": 55.8, "group": "green",
+     "image": "images/34.png"},
+    {"idx": 35, "type": "provider", "name": "B Gaming", "price": 200, "rent": 25, "group": "provider",
+     "image": "images/35.png"},
     {"idx": 36, "type": "gamble", "name": "Bonus Gamble", "image": "images/36.png"},
-    {"idx": 37, "type": "property", "name": "Clover Club", "price": 400, "rent": 80, "group": "darkblue", "image": "images/37.png"},
+    {"idx": 37, "type": "property", "name": "Clover Club", "price": 400, "rent": 80, "group": "darkblue",
+     "image": "images/37.png"},
     {"idx": 38, "type": "tax", "name": "Scatter Tax", "amount": 100, "image": "images/38.png"},
-    {"idx": 39, "type": "property", "name": "Space Zoo", "price": 350, "rent": 66.5, "group": "darkblue", "image": "images/39.png"},
+    {"idx": 39, "type": "property", "name": "Space Zoo", "price": 350, "rent": 66.5, "group": "darkblue",
+     "image": "images/39.png"},
 ]
 
 PROPERTY_GROUPS: Dict[str, List[int]] = {}
@@ -418,12 +463,30 @@ CREATE TABLE IF NOT EXISTS daily_giveaway (
 );
 """
 
+
 async def init_db():
     os.makedirs(ASSETS_DIR, exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(SCHEMA_SQL)
         await db.commit()
 
+
+async def get_rolls_history_channel(guild: discord.Guild):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            """
+            SELECT rolls_history_channel_id
+            FROM monopoly_channels
+            WHERE guild_id=?
+            """,
+            (guild.id,)
+        ) as cur:
+            row = await cur.fetchone()
+
+    if not row or not row[0]:
+        return None
+
+    return guild.get_channel(row[0])
 # ------------------ Board Image -------------------
 
 def load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -433,6 +496,7 @@ def load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     except Exception:
         pass
     return ImageFont.load_default()
+
 
 def generate_dice_face(value: int, size: int = 100) -> Image.Image:
     """Generate a glowing red dice with white pips."""
@@ -482,6 +546,7 @@ def generate_dice_face(value: int, size: int = 100) -> Image.Image:
     # Merge glow + dice
     out = Image.alpha_composite(glow, dice_layer)
     return out
+
 
 def board_coords(size: int, margin: int) -> Dict[int, Tuple[int, int, int, int]]:
     """
@@ -695,12 +760,15 @@ def render_board_with_players(
 
     return base
 
+
 def human_now() -> int:
     return int(time.time())
+
 
 # ------------------ Helpers -----------------------
 async def get_db():
     return await aiosqlite.connect(DB_PATH)
+
 
 async def ensure_guild_state(guild_id: int):
     db = await get_db()
@@ -717,24 +785,27 @@ async def ensure_guild_state(guild_id: int):
             )
         await db.commit()
     finally:
-        await db.close()   # ✅ clean close instead of async with
+        await db.close()  # ✅ clean close instead of async with
+
 
 async def get_player(db: aiosqlite.Connection, guild_id: int, user: discord.User) -> Optional[aiosqlite.Row]:
     db.row_factory = aiosqlite.Row
     async with db.execute("SELECT * FROM players WHERE guild_id=? AND user_id=?", (guild_id, user.id)) as cur:
         return await cur.fetchone()
 
+
 async def add_tx(db: aiosqlite.Connection, guild_id: int, user_id: int, amount: int, reason: str):
     await db.execute("INSERT INTO transactions (guild_id, user_id, amount, reason, ts) VALUES (?, ?, ?, ?, ?)",
-                    (guild_id, user_id, amount, reason, human_now()))
+                     (guild_id, user_id, amount, reason, human_now()))
+
 
 async def update_balance(
-    db: aiosqlite.Connection,
-    guild_id: int,
-    user_id: int,
-    delta: int,
-    reason: str,
-    bot: discord.Client = None
+        db: aiosqlite.Connection,
+        guild_id: int,
+        user_id: int,
+        delta: int,
+        reason: str,
+        bot: discord.Client = None
 ) -> int:
     # Update player's coin balance
     await db.execute(
@@ -745,8 +816,8 @@ async def update_balance(
 
     # Fetch updated balance
     async with db.execute(
-        "SELECT coins FROM players WHERE guild_id=? AND user_id=?",
-        (guild_id, user_id)
+            "SELECT coins FROM players WHERE guild_id=? AND user_id=?",
+            (guild_id, user_id)
     ) as cur:
         row = await cur.fetchone()
         if not row:
@@ -795,7 +866,7 @@ async def update_balance(
         # Try sending announcement
         channel = None
         if bot:
-            channel = bot.get_channel(REDEEM_CHANNEL_ID)
+            channel = await get_guild_channel(guild_id, "redeem_channel_id")
             if not channel:
                 guild = bot.get_guild(guild_id)
                 if guild:
@@ -814,6 +885,7 @@ async def update_balance(
 
     return balance
 
+
 async def log_transaction(guild, msg=None, embed=None, file=None):
     tx_channel = bot.get_channel(MONOPOLY_TRANSACTIONS_CHANNEL_ID)
     if tx_channel:
@@ -823,6 +895,7 @@ async def log_transaction(guild, msg=None, embed=None, file=None):
             await tx_channel.send(content=msg, embed=embed)
         else:
             await tx_channel.send(msg)
+
 
 async def fetch_avatar(bot: discord.Client, user_id: int) -> Image.Image:
     """Fetch a user's Discord avatar and return as a PIL Image."""
@@ -841,6 +914,53 @@ async def fetch_avatar(bot: discord.Client, user_id: int) -> Image.Image:
     return avatar
 
 
+def only_in_command_channel():
+    async def predicate(interaction: discord.Interaction):
+        # Fetch command channel ID from DB
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                "SELECT commands_channel_id FROM monopoly_channels WHERE guild_id=?",
+                (interaction.guild.id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if not row or not row[0]:
+                    await interaction.response.send_message(
+                        "⚠️ Command channel not configured. Contact an admin.",
+                        ephemeral=True
+                    )
+                    return False
+                commands_channel_id = row[0]
+
+        # If the command is used somewhere else, reject
+        if interaction.channel.id != commands_channel_id:
+            command_name = interaction.command.name
+            await interaction.response.send_message(
+                f"❌ You can only use **/{command_name}** in <#{commands_channel_id}>.",
+                ephemeral=True
+            )
+            return False
+
+        return True
+
+    return app_commands.check(predicate)
+
+def only_in_roll_channel():
+    async def predicate(interaction: discord.Interaction):
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                "SELECT roll_channel_id FROM monopoly_channels WHERE guild_id=?",
+                (interaction.guild.id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+        if not row or interaction.channel.id != row[0]:
+            return False  # ❌ DO NOT SEND MESSAGE HERE
+
+        return True
+
+    return app_commands.check(predicate)
+
 def circle_crop(im: Image.Image, size: int = 64) -> Image.Image:
     size = int(size)  # ✅ Ensure integer
     im = im.resize((size, size), Image.Resampling.LANCZOS)
@@ -851,6 +971,7 @@ def circle_crop(im: Image.Image, size: int = 64) -> Image.Image:
     out.putalpha(mask)
     return out
 
+
 def generate_dice_face(value: int, size: int = 100) -> Image.Image:
     """Generate a dice face image with given value (1–6)."""
     img = Image.new("RGBA", (size, size), (255, 255, 255, 255))  # white dice
@@ -858,7 +979,7 @@ def generate_dice_face(value: int, size: int = 100) -> Image.Image:
 
     # Draw border
     border = 6
-    draw.rounded_rectangle([0, 0, size-1, size-1], radius=15, outline=(0, 0, 0), width=border, fill=(255, 255, 255))
+    draw.rounded_rectangle([0, 0, size - 1, size - 1], radius=15, outline=(0, 0, 0), width=border, fill=(255, 255, 255))
 
     # Dot positions (normalized to grid)
     dot_positions = {
@@ -873,19 +994,20 @@ def generate_dice_face(value: int, size: int = 100) -> Image.Image:
     dot_r = size // 10
     for (x, y) in dot_positions[value]:
         cx, cy = int(x * size), int(y * size)
-        draw.ellipse([cx-dot_r, cy-dot_r, cx+dot_r, cy+dot_r], fill=(0, 0, 0))
+        draw.ellipse([cx - dot_r, cy - dot_r, cx + dot_r, cy + dot_r], fill=(0, 0, 0))
 
     return img
 
+
 async def render_board_with_players_avatars(
-    bot: commands.Bot,
-    guild_players: List[Tuple[int, str, int]],
-    size: int = 1600,
-    margin: int = 80,
-    center_tile_idx: Optional[int] = None,
-    dice: Optional[Tuple[int, int]] = None,
-    guild_id: Optional[int] = None,
-    force_default_art: bool = False,   # 👈 NEW
+        bot: commands.Bot,
+        guild_players: List[Tuple[int, str, int]],
+        size: int = 1600,
+        margin: int = 80,
+        center_tile_idx: Optional[int] = None,
+        dice: Optional[Tuple[int, int]] = None,
+        guild_id: Optional[int] = None,
+        force_default_art: bool = False,  # 👈 NEW
 ) -> Image.Image:
     # Ensure board exists
     if not os.path.exists(BOARD_IMAGE_PATH):
@@ -960,7 +1082,7 @@ async def render_board_with_players_avatars(
 
             # border
             border_size = 2
-            border = Image.new("RGBA", (token_size + border_size*2, token_size + border_size*2), (0, 0, 0, 0))
+            border = Image.new("RGBA", (token_size + border_size * 2, token_size + border_size * 2), (0, 0, 0, 0))
             border_draw = ImageDraw.Draw(border)
             border_draw.ellipse((0, 0, border.width, border.height), fill=(255, 215, 0, 255))
             border.paste(avatar_img, (border_size, border_size), avatar_img)
@@ -976,7 +1098,7 @@ async def render_board_with_players_avatars(
         if extra_count > 0:
             txt = f"+{extra_count}"
             draw.text(
-                ((x0 + x1)//2, (y0 + y1)//2),
+                ((x0 + x1) // 2, (y0 + y1) // 2),
                 txt,
                 font=font,
                 anchor="mm",
@@ -1066,6 +1188,7 @@ async def render_board_with_players_avatars(
 
     return base
 
+
 async def ensure_properties(db, guild_id: int):
     for sq in SLOT_BOARD:
         if sq["type"] in ("property", "provider", "utility"):
@@ -1075,8 +1198,10 @@ async def ensure_properties(db, guild_id: int):
             )
     await db.commit()
 
+
 async def set_position(db: aiosqlite.Connection, guild_id: int, user_id: int, pos: int):
     await db.execute("UPDATE players SET position=? WHERE guild_id=? AND user_id=?", (pos % 40, guild_id, user_id))
+
 
 async def full_group_owned(db: aiosqlite.Connection, guild_id: int, group: str, owner_id: int) -> bool:
     idxs = PROPERTY_GROUPS.get(group, [])
@@ -1084,16 +1209,17 @@ async def full_group_owned(db: aiosqlite.Connection, guild_id: int, group: str, 
         return False
     placeholders = ",".join(["?"] * len(idxs))
     async with db.execute(
-        f"SELECT COUNT(*) FROM properties WHERE guild_id=? AND idx IN ({placeholders}) AND owner_id=?",
-        (guild_id, *idxs, owner_id)
+            f"SELECT COUNT(*) FROM properties WHERE guild_id=? AND idx IN ({placeholders}) AND owner_id=?",
+            (guild_id, *idxs, owner_id)
     ) as cur:
         c = (await cur.fetchone())[0]
     return c == len(idxs)
 
+
 async def get_owner(db, guild_id: int, idx: int) -> Optional[int]:
     async with db.execute(
-        "SELECT owner_id FROM properties WHERE guild_id=? AND idx=?",
-        (guild_id, idx)
+            "SELECT owner_id FROM properties WHERE guild_id=? AND idx=?",
+            (guild_id, idx)
     ) as cur:
         row = await cur.fetchone()
         if row is None:
@@ -1130,12 +1256,12 @@ class BuyPassView(discord.ui.View):
         await interaction.response.edit_message(view=self)
         self.stop()
 
+
 # ------------------ Core Turn Logic ---------------
 async def process_landing(interaction, db, player_row, roll, double_rent: bool = False, utility_card: bool = False):
     guild_id = interaction.guild_id
     user = interaction.user
     pos = (player_row["position"] + roll) % 40
-
 
     # ✅ Save new position right away
     await set_position(db, guild_id, user.id, pos)
@@ -1172,7 +1298,6 @@ async def process_landing(interaction, db, player_row, roll, double_rent: bool =
             await log_transaction(interaction.guild, embed=embed, file=file)
         else:
             await log_transaction(interaction.guild, embed=embed)
-
 
     sq = SLOT_BOARD[pos]
 
@@ -2431,12 +2556,22 @@ async def process_landing(interaction, db, player_row, roll, double_rent: bool =
 
         return
 
+
 class GiveawayView(discord.ui.View):
     def __init__(self, guild_id, message_id):
         super().__init__(timeout=None)
         self.guild_id = guild_id
         self.message_id = message_id
         self.entries = set()  # store user_ids
+
+    async def get_giveaway_channel_id(self):
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                    "SELECT giveaway_channel_id FROM monopoly_channels WHERE guild_id=?",
+                    (self.guild_id,)
+            ) as cur:
+                row = await cur.fetchone()
+                return row[0] if row else None
 
     @discord.ui.button(
         label="🎲 Join Giveaway",
@@ -2445,23 +2580,47 @@ class GiveawayView(discord.ui.View):
     )
     async def join_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         member = interaction.user
-        role_ids = [r.id for r in member.roles]
 
-        if ELIGIBLE_ROLE_ID not in role_ids:
-            await interaction.response.send_message(
-                "⚠️ You’re not eligible for this giveaway.",
+        # Safely defer the interaction
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except (discord.errors.InteractionResponded, discord.errors.NotFound):
+            # Either already responded or interaction expired
+            pass
+
+        # --- Fetch Monopoly Role ID from DB ---
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                    "SELECT monopoly_role_id, join_channel_id FROM monopoly_channels WHERE guild_id = ?",
+                    (interaction.guild.id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if not row or not row[0]:
+                    await interaction.followup.send(
+                        "⚠️ Monopoly role not found. Contact an admin.",
+                        ephemeral=True
+                    )
+                    return
+                monopoly_role_id, join_channel_id = row
+
+        # --- Check if user has the role ---
+        if monopoly_role_id not in [r.id for r in member.roles]:
+            join_channel_mention = f"<#{join_channel_id}>" if join_channel_id else "`/monopoly_join`"
+            await interaction.followup.send(
+                f"⚠️ You need a Monopoly Role to join this giveaway. Please claim Role first in {join_channel_mention}!",
                 ephemeral=True
             )
             return
 
+        # --- Check if already entered ---
         if member.id in self.entries:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "✅ You’re already entered!",
                 ephemeral=True
             )
             return
 
-        # Add to memory + DB
+        # --- Add to memory + DB ---
         self.entries.add(member.id)
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
@@ -2470,101 +2629,115 @@ class GiveawayView(discord.ui.View):
             )
             await db.commit()
 
-        # ✅ Tell the user right away
-        await interaction.response.send_message(
+        # ✅ Notify user
+        await interaction.followup.send(
             f"🎉 {member.mention} joined the giveaway!",
             ephemeral=True
         )
 
-        # Update embed with entry count
-        channel = interaction.client.get_channel(GIVEAWAY_CHANNEL_ID)
-        try:
-            msg = await channel.fetch_message(self.message_id)
-            if msg.embeds:
-                embed = msg.embeds[0]
-                embed.set_footer(text=f"🎲 Entries: {len(self.entries)}")
-                await msg.edit(embed=embed, view=self)
-        except Exception as e:
-            print(f"⚠️ Failed to update giveaway message: {e}")
+        # --- Update main giveaway message footer ---
+        giveaway_channel_id = await self.get_giveaway_channel_id()
+        channel = interaction.guild.get_channel(giveaway_channel_id)
+        if channel:
+            try:
+                msg = await channel.fetch_message(self.message_id)
+                if msg.embeds:
+                    embed = msg.embeds[0]
+                    embed.set_footer(text=f"📡 Total Participants: {len(self.entries)}")
+                    await msg.edit(embed=embed, view=self)
+            except Exception as e:
+                print(f"⚠️ Failed to update giveaway message: {e}")
 
-
-def seconds_until_midnight_utc():
-    now = datetime.now(timezone.utc)
-    target = now.replace(hour=1, minute=20, second=00, microsecond=0)
-    if now >= target:
-        target += timedelta(days=1)
-    return (target - now).total_seconds()
-
-
-def seconds_until_draw():
-    now = datetime.now(timezone.utc)
-    target = now.replace(hour=1, minute=15, second=00, microsecond=0)
-    if now >= target:
-        target += timedelta(days=1)
-    return (target - now).total_seconds()
-
-async def scheduler_once():
-    # wait until next target time (15:07:30 for testing, 00:00 UTC in prod)
-    await asyncio.sleep(seconds_until_midnight_utc())
-    await start_daily_giveaway()
-    # schedule next run every 24h
-    daily_giveaway_scheduler.start()
-
-@tasks.loop(hours=24)
-async def daily_giveaway_scheduler():
-    await start_daily_giveaway()
-
-async def start_daily_giveaway():
-    channel = bot.get_channel(GIVEAWAY_CHANNEL_ID)
-    if not channel:
-        return
-
+async def load_active_giveaways():
     async with aiosqlite.connect(DB_PATH) as db:
-        await init_db()
+        async with db.execute("SELECT guild_id, message_id, giveaway_date FROM daily_giveaway") as cursor:
+            rows = await cursor.fetchall()
 
-        today = date.today().isoformat()
+    for guild_id, message_id, gdate in rows:
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            continue
+
+        # Use the global GIVEAWAY_CHANNEL_ID for the channel
+        channel = guild.get_channel(GIVEAWAY_CHANNEL_ID)
+        if not channel:
+            print(f"⚠️ Giveaway channel not found for guild {guild_id}")
+            continue
+
+        try:
+            # Fetch the giveaway message
+            msg = await channel.fetch_message(message_id)
+        except discord.NotFound:
+            print(f"⚠️ Could not restore giveaway {message_id} in guild {guild_id}: 404 Not Found")
+            continue
+
+        # Create the view and restore entries
+        view = GiveawayView(guild_id, message_id)
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                "SELECT user_id FROM giveaway_entries WHERE guild_id=? AND message_id=?",
+                (guild_id, message_id)
+            ) as cur:
+                entry_rows = await cur.fetchall()
+            for (uid,) in entry_rows:
+                view.entries.add(uid)
+
+        # Register the view
+        bot.add_view(view, message_id=message_id)
+        ACTIVE_GIVEAWAYS[guild_id] = view
+
+        # Re-attach the view to the message
+        await msg.edit(view=view)
+        print(f"🔄 Restored giveaway {message_id} in guild {guild_id} with {len(view.entries)} entries")
+
+@tasks.loop(minutes=1)
+async def daily_giveaway_scheduler():
+    now = datetime.now(timezone.utc)
+
+    # Post new giveaway at 01:20 UTC
+    if now.hour == 0 and now.minute == 18:
+        await start_daily_giveaway()
+
+    # Draw winners at 01:15 UTC
+    if now.hour == 0 and now.minute == 15:
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute("SELECT guild_id, message_id FROM daily_giveaway") as cur:
+                rows = await cur.fetchall()
+
+        for guild_id, message_id in rows:
+            await draw_winners(guild_id, message_id)
+
+async def draw_winners(guild_id, message_id):
+
+    # Double draw protection FIRST
+    async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            "SELECT message_id FROM daily_giveaway WHERE guild_id=? AND giveaway_date=?",
-            (channel.guild.id, today)
+            "SELECT 1 FROM daily_giveaway WHERE guild_id=?",
+            (guild_id,)
         ) as cur:
             exists = await cur.fetchone()
-        if exists:
-            return  # already posted today
 
-        embed = discord.Embed(
-            title="🎉 Daily Free Roll Giveaway!",
-            description=(
-                f"Members with <@&{ELIGIBLE_ROLE_ID}> can join by clicking below!\n\n"
-                f"🏆 **{WINNERS_COUNT} Winners** will each get **+1 Free Roll**!\n\n"
-                f"⏰ Winners drawn automatically at **<t:1758849300:t>** tomorrow."
-            ),
-            color=discord.Color.green()
-        )
-        embed.set_footer(text="🎲 Entries: 0")
-
-        view = GiveawayView(channel.guild.id, 0)
-        msg = await channel.send(embed=embed, view=view)
-
-        view.message_id = msg.id
-        ACTIVE_GIVEAWAYS[channel.guild.id] = view
-
-        await db.execute(
-            "INSERT OR REPLACE INTO daily_giveaway (guild_id, message_id, giveaway_date) VALUES (?, ?, ?)",
-            (channel.guild.id, msg.id, today)
-        )
-        await db.commit()
-
-        # Schedule drawing at next midnight
-        asyncio.create_task(draw_winners_at_midnight(channel.guild.id, msg.id))
-
-async def draw_winners_at_midnight(guild_id, message_id):
-    await asyncio.sleep(seconds_until_draw())
+    if not exists:
+        return  # Already drawn or no active giveaway
 
     guild = bot.get_guild(guild_id)
     if not guild:
         return
-    channel = guild.get_channel(GIVEAWAY_CHANNEL_ID)
-    log_channel = guild.get_channel(LOG_CHANNEL_ID)
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+                "SELECT giveaway_channel_id, rolls_history_channel_id FROM monopoly_channels WHERE guild_id=?",
+                (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+
+    if not row:
+        return
+
+    giveaway_channel_id, rolls_history_channel_id = row
+
+    channel = guild.get_channel(giveaway_channel_id)
+    log_channel = guild.get_channel(rolls_history_channel_id)
+
     if not channel:
         return
 
@@ -2574,7 +2747,7 @@ async def draw_winners_at_midnight(guild_id, message_id):
 
     entries = list(view.entries)
     if not entries:
-        await channel.send("⚠️ No eligible participants in today’s giveaway.")
+        await channel.send("⚠️ **Giveaway Failed:** No Participants.")
         return
 
     winners = random.sample(entries, min(WINNERS_COUNT, len(entries)))
@@ -2589,8 +2762,8 @@ async def draw_winners_at_midnight(guild_id, message_id):
 
     winner_mentions = ", ".join(f"<@{w}>" for w in winners)
     await channel.send(
-        f"🎉 Congratulations {winner_mentions}!\n"
-        f"You each won **+1 Free Roll** from the daily giveaway! 🎲"
+        f"📦 **Draw Confirmed!** Congratulations to {winner_mentions}.\n"
+        f"The Slot God has distributed **+1 Free Roll ** to your Monopoly profiles! 📡"
     )
 
     # Log winners + updated rolls
@@ -2608,9 +2781,12 @@ async def draw_winners_at_midnight(guild_id, message_id):
             log_text = "\n".join(lines)
 
         log_embed = discord.Embed(
-            title="📜 Daily Free Roll Winners",
-            description=log_text,
-            color=discord.Color.blue()
+            title="📑 Daily Giveaway — Free Rolls Distribution Log",
+            description=(
+                f"**Total Free Rolls Distributed:** {len(winners)}\n\n"
+                f"**Winners:**\n{log_text}"
+            ),
+            color=0x3498DB  # Ethereum Blue
         )
         await log_channel.send(embed=log_embed)
 
@@ -2622,6 +2798,95 @@ async def draw_winners_at_midnight(guild_id, message_id):
         await msg.edit(view=view)
     except:
         pass
+
+    # Remove old giveaway from DB
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM daily_giveaway WHERE guild_id=?",
+            (guild_id,)
+        )
+        await db.commit()
+
+    # Remove from memory
+    ACTIVE_GIVEAWAYS.pop(guild_id, None)
+
+async def start_daily_giveaway():
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT guild_id, giveaway_channel_id FROM monopoly_channels"
+        ) as cur:
+            rows = await cur.fetchall()
+
+    today = date.today().isoformat()
+
+    for guild_id, giveaway_channel_id in rows:
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            continue
+
+        channel = guild.get_channel(giveaway_channel_id)
+        if not channel:
+            continue
+
+        # Check if already posted today
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                "SELECT message_id FROM daily_giveaway WHERE guild_id=? AND giveaway_date=?",
+                (guild_id, today)
+            ) as cur:
+                exists = await cur.fetchone()
+
+            if exists:
+                continue
+
+        embed = discord.Embed(
+            title="🗳️ Daily Giveaway — Free Rolls!",
+            description=(
+                f"🎁 **{WINNERS_COUNT} Lucky Players** will receive +1 Roll!\n\n"
+                f"📡 Drawing winnters at ** <t:1758849300:t> **."
+            ),
+            color=0x3498DB
+        )
+        embed.set_footer(text="📡 Total Entries: 0")
+
+        view = GiveawayView(guild_id, 0)
+
+        # Get the Monopoly role to mention
+        monopoly_role = guild.get_role(MONOPOLY_ROLE_ID)
+        mention_text = monopoly_role.mention if monopoly_role else ""
+
+        # Send the message with role mention outside the embed
+        msg = await channel.send(
+            content=f"{mention_text}",
+            embed=embed,
+            view=view,
+            allowed_mentions=discord.AllowedMentions(roles=True)  # ensure the ping works
+        )
+        view.message_id = msg.id
+
+        ACTIVE_GIVEAWAYS[guild_id] = view
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO daily_giveaway (guild_id, message_id, giveaway_date) VALUES (?, ?, ?)",
+                (guild_id, msg.id, today)
+            )
+            await db.commit()
+
+async def check_and_draw_missed_giveaways():
+    await bot.wait_until_ready()
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT guild_id, message_id, giveaway_date FROM daily_giveaway") as cur:
+            rows = await cur.fetchall()
+
+    today = date.today().isoformat()
+
+    for guild_id, message_id, giveaway_date in rows:
+        # If giveaway is from previous day and not drawn yet
+        if giveaway_date < today:
+            print(f"⚠️ Found undrawn giveaway for guild {guild_id}, drawing now...")
+            await draw_winners(guild_id, message_id)
 
 @tasks.loop(hours=168)  # every 7 days
 async def collect_slot_owner_tax():
@@ -2646,7 +2911,7 @@ async def collect_slot_owner_tax():
             repossessed = []  # track repossessions
 
             async with db.execute(
-                "SELECT user_id, coins, last_roll FROM players WHERE guild_id=?", (guild_id,)
+                    "SELECT user_id, coins, last_roll FROM players WHERE guild_id=?", (guild_id,)
             ) as cur:
                 players = await cur.fetchall()
 
@@ -2657,8 +2922,8 @@ async def collect_slot_owner_tax():
 
                 # Get owned properties
                 async with db.execute(
-                    "SELECT idx FROM properties WHERE guild_id=? AND owner_id=?",
-                    (guild_id, user_id),
+                        "SELECT idx FROM properties WHERE guild_id=? AND owner_id=?",
+                        (guild_id, user_id),
                 ) as cur:
                     owned = await cur.fetchall()
 
@@ -2727,7 +2992,7 @@ async def collect_slot_owner_tax():
 
             # Get updated total pool
             async with db.execute(
-                "SELECT slot_prize_pool FROM game_state WHERE guild_id=?", (guild_id,)
+                    "SELECT slot_prize_pool FROM game_state WHERE guild_id=?", (guild_id,)
             ) as cur:
                 row = await cur.fetchone()
                 total_pool = row["slot_prize_pool"] if row else tax_total
@@ -2740,6 +3005,13 @@ async def collect_slot_owner_tax():
             ]
             breakdown_msg = "\n".join(breakdown_lines) if breakdown_lines else "No slot owners were taxed this week."
 
+            # 2️⃣ Transaction Log Channel Message (With Updated Balances)
+            log_lines = [
+                f"📑 <@{uid}>: -**${total:,.2f}** fee | 💳 **Balance: ${bal:,.2f}**"
+                for uid, count, base, idle, total, bal in tax_details
+            ]
+            log_breakdown = "\n".join(log_lines) if log_lines else "No transactions processed."
+
             repo_lines = [
                 f"💥 <@{uid}> had these properties repossessed: {', '.join(slots)}"
                 for uid, slots in repossessed
@@ -2750,7 +3022,22 @@ async def collect_slot_owner_tax():
                 )
             repo_msg = "\n".join(repo_lines) if repo_lines else ""
 
-            channel = bot.get_channel(TAX_ANNOUNCE_CHANNEL_ID)
+            async with db.execute(
+                    "SELECT tax_channel_id, transactions_channel_id FROM monopoly_channels WHERE guild_id=?",
+                    (guild_id,)
+            ) as cur:
+                row = await cur.fetchone()
+
+            if not row:
+                continue
+
+            tax_channel_id, transactions_channel_id = row
+
+            channel = bot.get_channel(tax_channel_id) or await bot.fetch_channel(tax_channel_id)
+
+            transactions_channel = bot.get_channel(transactions_channel_id) or await bot.fetch_channel(
+                transactions_channel_id)
+
             if channel:
                 claimable_share = int(total_pool * 0.25)
                 await channel.send(
@@ -2761,6 +3048,14 @@ async def collect_slot_owner_tax():
                     f"📜 **Breakdown:**\n{breakdown_msg}\n\n"
                     f"{repo_msg}"
                 )
+
+                if transactions_channel:
+                    log_embed = discord.Embed(
+                        title="📑 Weekly Slot Owner Tax Collected",
+                        description=f"**All Players balances have been updated:**\n\n{log_breakdown}",
+                        color=0x34495E
+                    )
+                    await transactions_channel.send(embed=log_embed)
 
 
 @collect_slot_owner_tax.before_loop
@@ -2780,278 +3075,298 @@ async def before_tax_loop():
     await asyncio.sleep(wait_seconds)
 
 
-@bot.tree.command(name="monopoly_join", description="Join Aaron Jay's Monopoly and receive starting Coins.")
-async def monopoly_join(interaction: discord.Interaction):
-    allowed_channel_id = 1419677495271096470  # ✅ Monopoly join channel
-
-    # Check if used in the correct channel
-    if interaction.channel.id != allowed_channel_id:
-        allowed_channel = interaction.guild.get_channel(allowed_channel_id)
-        await interaction.response.send_message(
-            f"⚠️ You can only join Monopoly in {allowed_channel.mention}.",
-            ephemeral=True  # keep this private so it doesn’t spam other channels
-        )
-        return
-
-    await interaction.response.defer()  # 👈 public response
-    await ensure_guild_state(interaction.guild_id)
-
-    async with aiosqlite.connect(DB_PATH) as db:
-        # Insert if new
-        await db.execute(
-            "INSERT OR IGNORE INTO players (guild_id, user_id, username, coins, position, jailed_until, last_roll) "
-            "VALUES (?, ?, ?, ?, 0, 0, 0)",
-            (interaction.guild_id, interaction.user.id, str(interaction.user), STARTING_COINS)
-        )
-        # Update username on rejoin
-        await db.execute(
-            "UPDATE players SET username=? WHERE guild_id=? AND user_id=?",
-            (str(interaction.user), interaction.guild_id, interaction.user.id)
-        )
-        await db.commit()
-
-    # 🎭 Assign Monopoly role
-    guild = interaction.guild
-    role = guild.get_role(1419593812501594195)  # Monopoly role ID
-    if role:
-        try:
-            await interaction.user.add_roles(role, reason="Joined Monopoly game")
-        except Exception as e:
-            print(f"⚠️ Could not assign role: {e}")
-
-    # ✅ Public confirmation message in join channel
-    await interaction.followup.send(
-        f"🎲 {interaction.user.mention} joined the Monopoly game!\n"
-        f"💰 Starting Balance: <:coin:1418612412885635206> **${STARTING_COINS:,.2f} Coins**\n"
-        f"Use `/monopoly_roll` every 4 hours to play.",
-    )
-
-    # 📜 Also log to transactions channel
-    embed = discord.Embed(
-        title="🎉 Monopoly Join",
-        description=(
-            f"{interaction.user.mention} joined the Monopoly game!\n"
-            f"💰 Starting Balance: <:coin:1418612412885635206> **${STARTING_COINS:,.2f} Coins**"
-        ),
-        color=discord.Color.green()
-    )
-    embed.set_thumbnail(url=interaction.user.display_avatar.url)
-
-    tx_channel = interaction.guild.get_channel(MONOPOLY_TRANSACTIONS_CHANNEL_ID)
-    if tx_channel:
-        await tx_channel.send(embed=embed)
-
-
 @bot.tree.command(name="monopoly_roll", description="Roll the dice and take your turn.")
+@only_in_roll_channel()
 async def monopoly_roll(interaction: discord.Interaction):
-    # ✅ Check if command used in the correct channel
-    if interaction.channel_id != ROLL_CHANNEL_ID:
-        await interaction.response.send_message(
-            f"⚠️ You can’t roll here! Please go to <#{ROLL_CHANNEL_ID}> to use `/monopoly_roll`.",
+    try:
+        await interaction.response.defer(thinking=True)
+
+        if GLOBAL_ROLL_LOCK.locked():
+            await interaction.followup.send(
+                "⚠️ Another user is currently rolling. Please wait."
+            )
+            return
+
+        async with GLOBAL_ROLL_LOCK:
+            await ensure_guild_state(interaction.guild_id)
+
+            async with aiosqlite.connect(DB_PATH) as db:
+                db.row_factory = aiosqlite.Row
+
+                # Fetch the join channel ID for this guild
+                async with db.execute(
+                        "SELECT join_channel_id FROM monopoly_channels WHERE guild_id=?",
+                        (interaction.guild_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+
+                if row and row["join_channel_id"]:
+                    join_channel = interaction.guild.get_channel(row["join_channel_id"])
+                else:
+                    join_channel = None
+
+                # Get the player
+                player = await get_player(db, interaction.guild_id, interaction.user)
+                if not player:
+                    channel_mention = join_channel.mention if join_channel else "the join channel"
+                    await interaction.followup.send(
+                        f"❌ Monopoly Profile not found. Please head over to {channel_mention} to initialize your account."
+                    )
+                    return
+
+                now = human_now()
+
+                # 🚔 Jail check
+                jailed_until = player["jailed_until"] if "jailed_until" in player.keys() else 0
+                if jailed_until and jailed_until > now:
+                    mins = int((jailed_until - now) / 60)
+                    await interaction.followup.send(
+                        f"⛓️ **You're still locked up for ~{mins} minutes. No rolls allowed!"
+                    )
+                    return
+
+                # 🎲 Rolls left
+                rolls_left = player["rolls_left"] if "rolls_left" in player.keys() else 0
+                if rolls_left <= 0:
+                    await interaction.followup.send(
+                        "🚫 You have **no rolls left**! Win a giveaway on Stream/Discord or a Rumble Game to earn a free roll."
+                    )
+                    return
+
+                # ⏳ Cooldown check
+                last_roll = player["last_roll"] if "last_roll" in player.keys() else 0
+                if now - last_roll < ROLL_COOLDOWN_SECONDS:
+                    left = ROLL_COOLDOWN_SECONDS - (now - last_roll)
+                    h, m, s = left // 3600, (left % 3600) // 60, left % 60
+                    await interaction.followup.send(
+                        f"⏳ **Cooldown:** Next Roll available in **{h}h {m}m {s}s**."
+                    )
+                    return
+
+                # Deduct roll + update last_roll
+                await db.execute(
+                    "UPDATE players SET rolls_left = rolls_left - 1, last_roll=? WHERE guild_id=? AND user_id=?",
+                    (now, interaction.guild_id, interaction.user.id)
+                )
+                await db.commit()
+
+                # Dice roll
+                forced = FORCED_NEXT_ROLL.pop(interaction.guild_id, None) if FORCED_NEXT_ROLL else None
+                d1, d2 = forced if forced else (random.randint(1, 6), random.randint(1, 6))
+                roll = d1 + d2
+
+                old_pos = player["position"]
+                landed_idx = (old_pos + roll) % 40
+                landed_tile_name = SLOT_BOARD[landed_idx]["name"]
+                old_tile_name = SLOT_BOARD[old_pos]["name"]
+
+                await interaction.followup.send(
+                    f"🎲 **Rolling...** {interaction.user.mention} rolled **{d1} + {d2} = {roll}**!\n"
+                    f"🛰️ **Moving** from **{old_pos} – {old_tile_name}** to **{landed_idx} – {landed_tile_name}**..."
+                )
+
+                # Doubles reward
+                if d1 == d2:
+                    await db.execute(
+                        "UPDATE players SET rolls_left = rolls_left + 1 WHERE guild_id=? AND user_id=?",
+                        (interaction.guild_id, interaction.user.id)
+                    )
+                    await db.commit()
+                    await interaction.followup.send(
+                        f"✨ **Double Roll!** {interaction.user.mention} earned a **+1 Free Roll** 🎟️"
+                    )
+
+                # Process landing
+                await process_landing(interaction, db, player, roll)
+
+                # Fetch final stats
+                async with db.execute(
+                        "SELECT position, rolls_left, jail_free_cards FROM players WHERE guild_id=? AND user_id=?",
+                        (interaction.guild_id, interaction.user.id)
+                ) as cur:
+                    stats = await cur.fetchone()
+
+                final_pos = stats["position"]
+                rolls_left = stats["rolls_left"]
+                jail_cards = stats["jail_free_cards"]
+                final_tile_name = SLOT_BOARD[final_pos]["name"]
+
+                # Roll log
+                landed_line = f"📍 Landed on: **{landed_idx} – {landed_tile_name}**"
+                if final_pos != landed_idx:
+                    landed_line += f" → moved to **{final_pos} – {final_tile_name}**"
+
+                roll_embed = discord.Embed(
+                    title=f"📡 Monopoly Update — {interaction.user.display_name}",
+                    description=(
+                        f"**Rolled:** {d1} + {d2} = **{roll}**\n"
+                        f"{landed_line}\n\n"
+                        f"🎟️ **Rolls Left:** {rolls_left}\n"
+                        f"🔐 **Get Out of Jail Free Cards:** {jail_cards}"
+                    ),
+                    color=0x3498DB
+                )
+                roll_embed.set_thumbnail(url=interaction.user.display_avatar.url)
+
+                async with db.execute(
+                        "SELECT roll_channel_id, rolls_history_channel_id FROM monopoly_channels WHERE guild_id=?",
+                        (interaction.guild_id,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+
+                # Roll history
+                history_channel = interaction.guild.get_channel(row[1]) if row and row[1] else None
+                if history_channel:
+                    history_embed = discord.Embed(
+                        title=f"📡 Network Sync — {interaction.user.display_name}",
+                        description=(
+                            f"👤 {interaction.user.mention}\n"
+                            f"🎲 {d1} + {d2} = **{roll}**\n"
+                            f"📍 Started: **{old_pos} – {old_tile_name}**\n"
+                            f"➡️ Landed: **{landed_idx} – {landed_tile_name}**\n\n"
+                            f"🎟️ **Rolls Left:** {rolls_left}\n"
+                            f"🔐 **Get Out of Jail Free Cards:** {jail_cards}"
+                        ),
+                        color=discord.Color.dark_blue()
+                    )
+                    if final_pos != landed_idx:
+                        history_embed.add_field(
+                            name="🔁 Final Position",
+                            value=f"**{final_pos} – {final_tile_name}**",
+                            inline=False
+                        )
+                    history_embed.set_footer(text=f"User ID: {interaction.user.id}")
+                    history_embed.timestamp = discord.utils.utcnow()
+                    history_embed.set_thumbnail(url=interaction.user.display_avatar.url)
+                    await history_channel.send(embed=history_embed)
+
+                # Render board
+                async with db.execute(
+                        "SELECT user_id, username, position FROM players WHERE guild_id=?",
+                        (interaction.guild_id,)
+                ) as cur:
+                    guild_players = [(row[0], row[1], row[2]) for row in await cur.fetchall()]
+
+                board_img = await render_board_with_players_avatars(
+                    bot, guild_players, center_tile_idx=landed_idx, dice=(d1, d2), guild_id=interaction.guild_id
+                )
+
+                buf = io.BytesIO()
+                board_img.save(buf, format="PNG")
+                buf.seek(0)
+
+                await interaction.followup.send(
+                    f"📜 **Latest Monopoly Status** for {interaction.guild.name}:",
+                    file=discord.File(buf, filename="monopoly_board.png")
+                )
+
+            except discord.errors.NotFound:
+            print(f"[WARN] Interaction expired for user {interaction.user.id}")
+
+
+@bot.tree.command(name="give_roll", description="(Admin) Give extra free rolls to a player.")
+@app_commands.describe(user="Wallet to receive airdrop", quantity="Number of rolls to airdrop")
+@only_in_command_channel()
+async def give_roll(interaction: discord.Interaction, user: discord.Member, quantity: int):
+
+    print("GIVE_ROLL START:", time.time())
+    print(f"🔥 GIVE_ROLL CALLED | quantity={quantity}")
+
+    await interaction.response.defer()
+
+    # 🔒 Admin check
+    if interaction.user.id != 488015447417946151:
+        await interaction.followup.send(
+            "❌ You don't have permission to use this command.",
             ephemeral=True
         )
         return
 
-    if GLOBAL_ROLL_LOCK.locked():
-        await interaction.response.send_message(
-            "⚠️ Someone is rolling right now. Please wait a few seconds.", ephemeral=True
+    if quantity <= 0:
+        await interaction.followup.send(
+            "❌ Quantity must be positive.",
+            ephemeral=True
         )
         return
 
-    async with GLOBAL_ROLL_LOCK:
-        await interaction.response.defer()
-        await ensure_guild_state(interaction.guild_id)
-
-        async with aiosqlite.connect(DB_PATH) as db:
-            db.row_factory = aiosqlite.Row
-            player = await get_player(db, interaction.guild_id, interaction.user)
-            if not player:
-                await interaction.followup.send("You are not in the game. Use `/monopoly_join` first.")
-                return
-
-            now = human_now()
-
-            # 🚔 Jail check
-            jailed_until = player["jailed_until"] if "jailed_until" in player.keys() else 0
-            if jailed_until and jailed_until > now:
-                mins = int((jailed_until - now) / 60)
-                await interaction.followup.send(f"🚔 You're still locked up for **~{mins} minutes**. No rolls allowed!")
-                return
-
-            # 🎲 Rolls left (sqlite Row -> use keys())
-            rolls_left = player["rolls_left"] if "rolls_left" in player.keys() else 0
-            if rolls_left <= 0:
-                await interaction.followup.send("🚫 You have **no rolls left**! Win a giveaway on Stream/Discord or a Rumble Game to earn a free roll.")
-                return
-
-            # ⏳ Cooldown check
-            last_roll = player["last_roll"] or 0
-            if now - last_roll < ROLL_COOLDOWN_SECONDS:
-                left = ROLL_COOLDOWN_SECONDS - (now - last_roll)
-                h, m, s = left // 3600, (left % 3600) // 60, left % 60
-                await interaction.followup.send(f"⏳ Cooldown: **{h}h {m}m {s}s** remaining.")
-                return
-
-            # ✅ Deduct roll + set last_roll
-            await db.execute(
-                "UPDATE players SET rolls_left = rolls_left - 1, last_roll=? WHERE guild_id=? AND user_id=?",
-                (now, interaction.guild_id, interaction.user.id)
-            )
-            await db.commit()
-
-            # 🎲 Dice roll (honor forced test rolls if set)
-            forced = None
-            try:
-                forced = FORCED_NEXT_ROLL.pop(interaction.guild_id, None)
-            except Exception:
-                forced = None
-
-            if forced is not None:
-                d1, d2 = forced
-            else:
-                d1, d2 = random.randint(1, 6), random.randint(1, 6)
-            roll = d1 + d2
-
-            old_pos = player["position"]
-            # Save the tile they *landed on from the dice* — use this for the board center
-            landed_idx = (old_pos + roll) % 40
-            landed_tile_name = SLOT_BOARD[landed_idx]["name"]
-            old_tile_name = SLOT_BOARD[old_pos]["name"]
-
-            # Announce movement (dice result)
-            await interaction.followup.send(
-                f"🎲 {interaction.user.mention} rolled **{d1} + {d2} = {roll}**!\n"
-                f"📍 Moving from **{old_pos} – {old_tile_name}** to **{landed_idx} – {landed_tile_name}**..."
-            )
-
-            # 🎁 Doubles reward (same logic as before)
-            if d1 == d2:
-                await db.execute(
-                    "UPDATE players SET rolls_left = rolls_left + 1 WHERE guild_id=? AND user_id=?",
-                    (interaction.guild_id, interaction.user.id),
-                )
-                await db.commit()
-                await interaction.followup.send(
-                    f"✨ {interaction.user.mention} rolled **doubles**! You earned **+1 Free Roll** 🎟️"
-                )
-
-            # Process the landing (this may move the player again via card effects)
-            await process_landing(interaction, db, player, roll)
-
-            # After landing logic is done, fetch the player's *final* position and updated stats
-            async with db.execute(
-                "SELECT position, rolls_left, jail_free_cards FROM players WHERE guild_id=? AND user_id=?",
-                (interaction.guild_id, interaction.user.id)
-            ) as cur:
-                stats = await cur.fetchone()
-
-            final_pos = stats["position"]
-            rolls_left = stats["rolls_left"]
-            jail_cards = stats["jail_free_cards"]
-
-            final_tile_name = SLOT_BOARD[final_pos]["name"]
-
-            # Build roll log: show initial landed tile and (if different) the final tile after card effects
-            landed_line = f"📍 Landed on: **{landed_idx} – {landed_tile_name}**"
-            if final_pos != landed_idx:
-                landed_line += f" → moved to **{final_pos} – {final_tile_name}**"
-
-            roll_embed = discord.Embed(
-                title=f"🎲 Monopoly Roll — {interaction.user.display_name}",
-                description=(
-                    f"Rolled: **{d1} + {d2} = {roll}**\n"
-                    f"{landed_line}\n\n"
-                    f"🎟️ Rolls Left: **{rolls_left}**\n"
-                    f"🆓 Get Out of Jail Free Cards: **{jail_cards}**"
-                ),
-                color=discord.Color.blue()
-            )
-            roll_embed.set_thumbnail(url=interaction.user.display_avatar.url)
-
-            roll_channel = interaction.guild.get_channel(1419655999538597929)
-            if roll_channel:
-                await roll_channel.send(embed=roll_embed)
-
-            # 🖼️ Updated board image — show the tile they *first landed on* (landed_idx)
-            async with db.execute(
-                "SELECT user_id, username, position FROM players WHERE guild_id=?",
-                (interaction.guild_id,)
-            ) as cur:
-                guild_players = [(row[0], row[1], row[2]) for row in await cur.fetchall()]
-
-            board_img = await render_board_with_players_avatars(
-                bot, guild_players, center_tile_idx=landed_idx, dice=(d1, d2), guild_id=interaction.guild_id
-            )
-
-            buf = io.BytesIO()
-            board_img.save(buf, format="PNG")
-            buf.seek(0)
-
-            await interaction.followup.send(
-                f"📜 Current Monopoly board for {interaction.guild.name}:",
-                file=discord.File(buf, filename="monopoly_board.png")
-            )
-
-
-@bot.tree.command(name="give_roll", description="(Admin) Give extra rolls to a player.")
-@app_commands.describe(user="Player to give rolls to", quantity="Number of rolls to give")
-async def give_roll(interaction: discord.Interaction, user: discord.Member, quantity: int):
-    # 🔒 Admin check
-    if interaction.user.id != 488015447417946151:
-        await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
-        return
-
-    if quantity <= 0:
-        await interaction.response.send_message("❌ Quantity must be positive.", ephemeral=True)
-        return
-
     async with aiosqlite.connect(DB_PATH) as db:
-        # 🔍 Check if user exists in players
+
+        print("DB PATH:", DB_PATH)
+        print("GUILD ID:", interaction.guild_id)
+        print("USER ID:", user.id)
+
+        # Debug: show all rows
         async with db.execute(
-            "SELECT rolls_left, jail_free_cards FROM players WHERE guild_id=? AND user_id=?",
+            "SELECT guild_id, user_id, rolls_left FROM players WHERE user_id=?",
+            (user.id,)
+        ) as cur:
+            all_rows = await cur.fetchall()
+
+        print("ALL ROWS FOR USER:", all_rows)
+
+        # Fetch correct row
+        async with db.execute(
+            "SELECT rolls_left FROM players WHERE guild_id=? AND user_id=?",
             (interaction.guild_id, user.id)
         ) as cur:
             row = await cur.fetchone()
 
-        if not row:
-            await interaction.response.send_message(
-                f"⚠️ {user.mention} has **not joined the game yet**. They must use `/monopoly_join` first!"
+        if row is None:
+            await interaction.followup.send(
+                "❌ Player does not have a Monopoly Role yet.",
+                ephemeral=True
             )
             return
 
-        rolls_left, jail_free = row
-        new_rolls = rolls_left + quantity
+        print("EXACT ROW BEFORE:", row)
 
-        # ✅ Update rolls
         await db.execute(
-            "UPDATE players SET rolls_left = ? WHERE guild_id=? AND user_id=?",
-            (new_rolls, interaction.guild_id, user.id)
+            "UPDATE players SET rolls_left = rolls_left + ? WHERE guild_id=? AND user_id=?",
+            (quantity, interaction.guild_id, user.id)
         )
+
         await db.commit()
 
-    # ✅ Reply to admin
-    await interaction.response.send_message(
-        f"✅ Gave **{quantity} free rolls** to {user.mention}.", ephemeral=False
-    )
+        # Fetch current rolls and jail-free cards
+        async with db.execute(
+                "SELECT rolls_left, jail_free_cards FROM players WHERE guild_id=? AND user_id=?",
+                (interaction.guild_id, user.id)
+        ) as cur:
+            row = await cur.fetchone()
 
-    # 🎲 Build log embed for rolls channel
-    embed = discord.Embed(
-        title="🎁 Extra Rolls Granted",
-        description=(
-            f"{user.mention} received **{quantity} Free Rolls**!\n\n"
-            f"🎲 Rolls Left: **{new_rolls}**\n"
-            f"🆓 Get Out of Jail Free Cards: **{jail_free}**"
-        ),
-        color=discord.Color.blue()
-    )
-    embed.set_thumbnail(url=user.display_avatar.url)
+        if row:
+            new_rolls, jail_free_cards = row
+        else:
+            new_rolls, jail_free_cards = 0, 0  # fallback
 
-    rolls_channel = interaction.guild.get_channel(1281563200739082291)
-    if rolls_channel:
-        await rolls_channel.send(embed=embed)
+        roll_word = "roll" if quantity == 1 else "rolls"
+
+        # ✅ Send success message to the admin who ran the command
+        await interaction.followup.send(
+            f"✅ Distributed **{quantity}** free {roll_word} to {user.mention}."
+        )
+
+        # ✅ Prepare the public embed log
+        embed = discord.Embed(
+            title="🎁 Manual Free Rolls Distribution",
+            description=(
+                f"{user.mention} received {quantity} manual free {roll_word}.\n\n"
+                f"🎟️ Free Rolls: **{new_rolls}**\n"
+                f"🔐 Jail-Free Cards: **{jail_free_cards}**"
+            ),
+            color=0x3498DB
+        )
+
+        embed.set_thumbnail(url=user.display_avatar.url)
+
+        # ✅ Send the embed to the history channel for public logs
+        rolls_history_channel = interaction.guild.get_channel(ROLLS_HISTORY_CHANNEL_ID)
+        if rolls_history_channel:
+            await rolls_history_channel.send(embed=embed)
 
 
-@bot.tree.command(name="monopoly_board", description="Show the Aaron Jay's Monopoly board with player positions.")
+@bot.tree.command(name="monopoly_board", description="Visualize the current Monopoly state and player positions.")
+@only_in_command_channel()
 async def monopoly_board(interaction: discord.Interaction):
     await interaction.response.defer()
     await ensure_guild_state(interaction.guild_id)
@@ -3080,18 +3395,27 @@ async def monopoly_board(interaction: discord.Interaction):
     await interaction.followup.send(file=discord.File(buf, "monopoly_board.png"))
 
 
-@bot.tree.command(name="monopoly_profile", description="Your Coins, properties, and net worth.")
+@bot.tree.command(name="monopoly_profile", description="View your Monopoly Profile.")
+@only_in_command_channel()
 async def monopoly_profile(interaction: discord.Interaction, member: Optional[discord.Member] = None):
-    allowed_channel_id = 1419677495271096470  # ✅ Monopoly channel only
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
 
-    # Channel restriction
-    if interaction.channel.id != allowed_channel_id:
-        allowed_channel = interaction.guild.get_channel(allowed_channel_id)
-        await interaction.response.send_message(
-            f"⚠️ You can only view Monopoly profiles in {allowed_channel.mention}.",
-            ephemeral=True
-        )
-        return
+        async with db.execute(
+                "SELECT commands_channel_id FROM monopoly_channels WHERE guild_id=?",
+                (interaction.guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+
+        commands_channel = interaction.guild.get_channel(row["commands_channel_id"]) if row and row[
+            "commands_channel_id"] else None
+
+        if commands_channel and interaction.channel.id != commands_channel.id:
+            await interaction.response.send_message(
+                f"⚠️ **Connection Error:** Wallet Metadata is only accessible in {commands_channel.mention}.",
+                ephemeral=True
+            )
+            return
     member = member or interaction.user
     await interaction.response.defer()
     await ensure_guild_state(interaction.guild_id)
@@ -3100,7 +3424,8 @@ async def monopoly_profile(interaction: discord.Interaction, member: Optional[di
         db.row_factory = aiosqlite.Row
         player = await get_player(db, interaction.guild_id, member)
         if not player:
-            await interaction.followup.send("No profile found. Use `/monopoly_join`.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ **Wallet Not Initialized.** Use `/monopoly_join` to sync with the mainnet.", ephemeral=True)
             return
 
         async with db.execute(
@@ -3122,22 +3447,35 @@ async def monopoly_profile(interaction: discord.Interaction, member: Optional[di
 
     # Build embed
     embed = discord.Embed(
-        title=f"{member.display_name} — Aaron Jay's Monopoly",
-        color=0x6aa6ff
+        title=f"Monopoly — {member.display_name}",
+        description=f"Verified Member on the **Aaron Jay Monopoly**.",
+        color=0x3498DB  # Web3 Blue
     )
-    embed.set_thumbnail(url=member.display_avatar.url)  # ✅ Avatar as thumbnail
-    embed.add_field(name="💰 Monopoly Coins", value=f"<:coin:1418612412885635206> ${player['coins']}")
+    embed.set_thumbnail(url=member.display_avatar.url)
     embed.add_field(
-        name="📍 Position",
-        value=f"{player['position']} — {SLOT_BOARD[player['position']]['name']}",
+        name="💰 Total Coin",
+        value=f"<:coin:1418612412885635206> **${player['coins']:,.2f}**",
+        inline=True
+    )
+    embed.add_field(
+        name="📍 Current Position",
+        value=f"Sector {player['position']} — **{SLOT_BOARD[player['position']]['name']}**",
         inline=False
     )
-    embed.add_field(name="🏠 Properties", value=names, inline=False)
-    embed.add_field(name="🎰 Slot Income", value=f"<:coin:1418612412885635206> ${total_income:,.2f}/visit", inline=True)
-    embed.add_field(name="🏦 Weekly Tax", value=f"<:coin:1418612412885635206> ${total_tax:,.2f}/week", inline=True)
+    embed.add_field(name="🖼️ Properties", value=names, inline=False)
+
+    embed.add_field(
+        name="💹 Slot Income",
+        value=f"<:coin:1418612412885635206> **${total_income:,.2f}**/sync",
+        inline=True
+    )
+    embed.add_field(
+        name="🛠️ Weekly Tax",
+        value=f"<:coin:1418612412885635206> **${total_tax:,.2f}**/week",
+        inline=True
+    )
 
     await interaction.followup.send(embed=embed)
-
 
 class LeaderboardView(View):
     def __init__(self, pages, author):
@@ -3197,15 +3535,28 @@ class PageSelect(discord.ui.Select):
         await self.parent_view.update_page(interaction)
 
 
-@bot.tree.command(name="monopoly_leaderboard", description="Leaderboard: Top slot owners by Slot Income.")
+@bot.tree.command(name="monopoly_leaderboard", description="Top Players ranked by Slot Income.")
+@only_in_command_channel()
 async def monopoly_leaderboard(interaction: discord.Interaction):
-    allowed_channel_id = 1419677495271096470  # ✅ Monopoly channel only
+    # Fetch allowed commands channel from DB
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT commands_channel_id FROM monopoly_channels WHERE guild_id=?",
+            (interaction.guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+
+        commands_channel = (
+            interaction.guild.get_channel(row["commands_channel_id"])
+            if row and row["commands_channel_id"]
+            else None
+        )
 
     # Channel restriction
-    if interaction.channel.id != allowed_channel_id:
-        allowed_channel = interaction.guild.get_channel(allowed_channel_id)
+    if commands_channel and interaction.channel.id != commands_channel.id:
         await interaction.response.send_message(
-            f"⚠️ You can only view Monopoly Leaderboard in {allowed_channel.mention}.",
+            f"⚠️ **Access Denied:** Leaderboard is only accessible in {commands_channel.mention}.",
             ephemeral=True
         )
         return
@@ -3288,14 +3639,14 @@ async def monopoly_leaderboard(interaction: discord.Interaction):
                 weekly_tax_str = f"{p['weekly_tax']:,.2f}"
 
                 embed = discord.Embed(
-                    title=f"#{i} — {user.display_name if user else 'Unknown'}",
+                    title=f"🐋 Leaderboard Rank #{i} — {user.display_name if user else 'Unknown'}",
                     description=(
-                        f"👤 <@{p['user_id']}>\n"
-                        f"💰 Coins: <:coin:1418612412885635206> **${coins_str}**\n"
-                        f"🏠 Properties: **{p['prop_count']}**\n"
-                        f"🎰 Slot Income: <:coin:1418612412885635206> **${income_str}**\n"
-                        f"🏦 Weekly Tax: <:coin:1418612412885635206> **${weekly_tax_str}**\n\n"
-                        f"**Slots Owned:**\n{slots_list}"
+                        f"🛰️ **Player:** <@{p['user_id']}>\n"
+                        f"💰 **Coins:** <:coin:1418612412885635206> **${coins_str}**\n"
+                        f"🖼️ **Properties:**  **{p['prop_count']}**\n"
+                        f"💹 **Slot Income:** <:coin:1418612412885635206> **${income_str}**\n"
+                        f"🛠️ **Weekly Tax:** <:coin:1418612412885635206> **${weekly_tax_str}**\n\n"
+                        f"📂 **Properties:**\n{slots_list}"
                     ),
                     color=discord.Color.gold()
                 )
@@ -3314,18 +3665,20 @@ async def monopoly_leaderboard(interaction: discord.Interaction):
         view=LeaderboardView(pages, interaction.user)
     )
 
+
 @bot.tree.command(name="jail", description="Admin command to jail a player for a set duration (hours).")
 @app_commands.describe(
     user="The player to jail.",
     hours="How many hours to jail them for."
 )
-async def jail(interaction: discord.Interaction, user: discord.Member, hours: int):
-    # 🔒 Check admin permission
-    if interaction.user.id != 488015447417946151:  # Replace with your admin ID
-        await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
+@only_in_command_channel()
+async def lock_wallet(interaction: discord.Interaction, user: discord.Member, hours: int):
+    # 🔒 Protocol Admin Check
+    if interaction.user.id != 488015447417946151:
+        await interaction.response.send_message("❌ **Access Denied:** You do not have the required security clearance.", ephemeral=True)
         return
 
-    # Convert hours to seconds and calculate jailed_until timestamp
+    # Convert hours to network seconds for the Smart Contract Lock
     jailed_until = int(time.time()) + hours * 3600
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -3335,8 +3688,10 @@ async def jail(interaction: discord.Interaction, user: discord.Member, hours: in
         )
         await db.commit()
 
+    # ✅ Admin Confirmation Message
     await interaction.response.send_message(
-        f"🚔 {user.mention} has been **jailed** for **{hours} hours**! They cannot roll during this time."
+        f"⛓️ **Go to Jail!** {user.mention} has been **Locked Up** for **{hours} hours**.\n"
+        f"📡 They can't Roll for 24 hours."
     )
 
 @bot.tree.command(name="regen_board", description="Admin only: Regenerate the Monopoly board image.")
@@ -3354,8 +3709,14 @@ async def regen_board(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"⚠️ Error: {e}", ephemeral=True)
 
-@bot.tree.command(name="monopoly_rules", description="Show the rules and guide for Aaron Jay’s Monopoly.")
-async def monopoly_rules(interaction: discord.Interaction):
+
+def get_monopoly_rules_embeds(
+    guild: discord.Guild,
+    join_channel: discord.TextChannel = None,
+    monopoly_role: discord.Role = None,
+    roll_channel: discord.TextChannel = None,
+    giveaway_channel: discord.TextChannel = None
+):
     embeds = []
 
     # 1️⃣ Intro + How to Join
@@ -3367,24 +3728,24 @@ async def monopoly_rules(interaction: discord.Interaction):
     e1.add_field(
         name="✏️ How to Join",
         value=(
-            "• Use **`/monopoly_join`** in **<#1419677495271096470>**\n"
-            "• Receive <:coin:1418612412885635206> **$1500 Coins** and <@&1419593812501594195> role\n"
-            "• Once joined, you can roll, buy properties, and compete"
+            f"• Go to {join_channel.mention if join_channel else 'the join channel'} and click the button to join\n"
+            f"• Receive an initial Balance of <:coin:1418612412885635206> **${STARTING_COINS:,.2f} Coins**\n"
+            f"• Gain the {monopoly_role.mention if monopoly_role else 'Monopoly Role'} to be eligible"
         ),
         inline=False
     )
     embeds.append(e1)
 
     # 2️⃣ Rolling the Dice + Properties
-    e2 = discord.Embed(color=discord.Color.blue())
+    e2 = discord.Embed(color=0xF1C40F)  # Gold
     e2.add_field(
         name="🎲 Rolling the Dice",
         value=(
-            "• Use **`/monopoly_roll`** in **<#1419646214848385106>**\n"
+            f"• Use **`/monopoly_roll`** in {roll_channel.mention if roll_channel else 'the roll channel'}\n"
             "• Roll **2 dice** and move forward\n"
             "• **Doubles = +1 Free Roll** 🎟️\n"
             "• Cooldown: **every 4h**\n"
-            "• Extra rolls: win from **<#1419644877712396339>**"
+            f"• Extra Rolls: Claim from {giveaway_channel.mention if giveaway_channel else 'the giveaway channel'}"
         ),
         inline=False
     )
@@ -3401,9 +3762,9 @@ async def monopoly_rules(interaction: discord.Interaction):
     embeds.append(e2)
 
     # 3️⃣ Money System + Jail
-    e3 = discord.Embed(color=discord.Color.green())
+    e3 = discord.Embed(color=0x2ECC71)  # Success Green
     e3.add_field(
-        name="💸 Money System",
+        name=" Money System",
         value=(
             "**Earn Coins by:**\n"
             "➖ Landing or passing **GO**\n"
@@ -3426,7 +3787,7 @@ async def monopoly_rules(interaction: discord.Interaction):
     embeds.append(e3)
 
     # 4️⃣ Weekly Tax + Winning
-    e4 = discord.Embed(color=discord.Color.purple())
+    e4 = discord.Embed(color=0x9B59B6)  # Purple
     e4.add_field(
         name="🏦 Weekly Taxes",
         value=(
@@ -3448,21 +3809,336 @@ async def monopoly_rules(interaction: discord.Interaction):
     embeds.append(e4)
 
     # 5️⃣ Commands Summary
-    e5 = discord.Embed(color=discord.Color.orange())
+    e5 = discord.Embed(color=0xE67E22)  # Orange
     e5.add_field(
-        name="🎮 Commands Summary",
+        name="🎮 Network Commands",
         value=(
             "• **/monopoly_join** → Join game ($1500 start)\n"
             "• **/monopoly_roll** → Roll dice (4h cooldown)\n"
-            "• **/monopoly_profile [@user]** → View stats\n"
+            "• **/monopoly_profile** [@user]** → View stats\n"
             "• **/monopoly_leaderboard** → View rankings\n"
-            "• **Daily Free Roll Giveaway** → Join with button"
+            "• **Daily Snapshot Raffle** → Join with button"
         ),
         inline=False
     )
     embeds.append(e5)
 
-    await interaction.response.send_message(embeds=embeds)
+    return embeds
+
+@bot.tree.command(
+    name="monopoly_setup",
+    description="Create all Monopoly channels safely (handles missing or renamed channels)",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def monopoly_setup(interaction: discord.Interaction):
+    if interaction.user.id != ADMIN_ID:
+        await interaction.response.send_message("❌ You are not allowed to use this command.", ephemeral=True)
+        return
+
+    # Defer immediately
+    try:
+        await interaction.response.defer(ephemeral=True)
+    except discord.NotFound:
+        # Interaction already expired; fallback (rare)
+        pass
+
+    guild = interaction.guild
+
+    # 🎭 Create or fetch Monopoly Role
+    role_name = "🎩 🇲‌🇴‌🇳‌🇴‌🇵‌🇴‌🇱‌🇾‌"
+    role_color = discord.Color(0xE67E22)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT monopoly_role_id FROM monopoly_channels WHERE guild_id = ?", (guild.id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            saved_role_id = row[0] if row else None
+
+    monopoly_role = guild.get_role(saved_role_id) if saved_role_id else None
+    if monopoly_role is None:
+        monopoly_role = discord.utils.get(guild.roles, name=role_name)
+    if monopoly_role is None:
+        monopoly_role = await guild.create_role(
+            name=role_name,
+            color=role_color,
+            mentionable=True,
+            reason="Monopoly Game Role"
+        )
+
+    if monopoly_role.color != role_color:
+        await monopoly_role.edit(color=role_color)
+
+    # Move role just under bot's top role
+    bot_top_role = guild.me.top_role
+    new_position = max(bot_top_role.position - 1, 1)  # Prevents 0 or negative
+    await monopoly_role.edit(position=new_position)
+
+    # 🎲 Get or create Monopoly category
+    category = discord.utils.get(guild.categories, name="🎲 MONOPOLY")
+    if not category:
+        category = await guild.create_category("🎲 MONOPOLY")
+
+    # Define channels to create
+    channels_to_create = {
+        "join_channel": "📡-ᴊᴏɪɴ",
+        "giveaway_channel": "🎁-ɢɪᴠᴇᴀᴡᴀʏ",
+        "roll_channel": "🎲-ʀᴏʟʟ",
+        "rolls_history_channel": "📜-ʀᴏʟʟs ʜɪsᴛᴏʀʏ",
+        "tx_channel": "💰-ᴛʀᴀɴsᴀᴄᴛɪᴏɴs",
+        "tax_channel": "🏛-ᴡᴇᴇᴋʟʏ ᴛᴀx",
+        "redeem_channel": "🏦-ᴡɪɴɴᴇʀs",
+        "rules_channel": "📜-ʀᴜʟᴇs",
+        "commands_channel": "🎮-ᴄᴏᴍᴍᴀɴᴅs",
+        "rumble_channel": "🥊-ʀᴜᴍʙʟᴇ"
+    }
+
+    # Load existing channel IDs from DB
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT * FROM monopoly_channels WHERE guild_id = ?", (guild.id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+
+    existing_ids = {}
+    if row:
+        col_names = [
+            "guild_id",
+            "roll_channel_id",
+            "join_channel_id",
+            "transactions_channel_id",
+            "monopoly_role_id",
+            "giveaway_channel_id",
+            "tax_channel_id",
+            "rolls_history_channel_id",
+            "commands_channel_id",
+            "redeem_channel_id",
+            "rules_channel_id",
+            "rumble_channel_id"
+        ]
+        existing_ids = dict(zip(col_names, row))
+
+    # Helper function to get or create a channel safely
+    async def get_or_create_channel(var_name, ch_name):
+        db_key = f"{var_name}_id"
+        saved_id = existing_ids.get(db_key)
+        channel = guild.get_channel(saved_id) if saved_id else None
+
+        # fallback: search by name in category
+        if not channel:
+            for ch in category.text_channels:
+                if ch.name == ch_name:
+                    channel = ch
+                    break
+
+        # create new if still missing
+        if not channel:
+            channel = await guild.create_text_channel(ch_name, category=category)
+        return channel
+
+    # Create or fetch channels
+    channel_objects = {}
+    for var_name, ch_name in channels_to_create.items():
+        channel_objects[var_name] = await get_or_create_channel(var_name, ch_name)
+
+    # Save IDs to globals
+    global ROLL_CHANNEL_ID, GIVEAWAY_CHANNEL_ID, MONOPOLY_TRANSACTIONS_CHANNEL_ID, MONOPOLY_ROLE_ID
+    global REDEEM_CHANNEL_ID, COMMANDS_CHANNEL_ID, JOIN_CHANNEL_ID, TAX_CHANNEL_ID, ROLLS_HISTORY_CHANNEL_ID, RULES_CHANNEL_ID, RUMBLE_CHANNEL_ID
+
+    JOIN_CHANNEL_ID = channel_objects["join_channel"].id
+    GIVEAWAY_CHANNEL_ID = channel_objects["giveaway_channel"].id
+    ROLL_CHANNEL_ID = channel_objects["roll_channel"].id
+    ROLLS_HISTORY_CHANNEL_ID = channel_objects["rolls_history_channel"].id
+    MONOPOLY_TRANSACTIONS_CHANNEL_ID = channel_objects["tx_channel"].id
+    TAX_CHANNEL_ID = channel_objects["tax_channel"].id
+    REDEEM_CHANNEL_ID = channel_objects["redeem_channel"].id
+    RULES_CHANNEL_ID = channel_objects["rules_channel"].id
+    COMMANDS_CHANNEL_ID = channel_objects["commands_channel"].id
+    MONOPOLY_ROLE_ID = monopoly_role.id
+    RUMBLE_CHANNEL_ID = channel_objects["rumble_channel"].id
+
+    # Update database
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT OR REPLACE INTO monopoly_channels
+            (guild_id, roll_channel_id, join_channel_id, transactions_channel_id,
+             monopoly_role_id, giveaway_channel_id, tax_channel_id, rolls_history_channel_id, commands_channel_id, redeem_channel_id, rules_channel_id, rumble_channel_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                guild.id,
+                ROLL_CHANNEL_ID,
+                JOIN_CHANNEL_ID,
+                MONOPOLY_TRANSACTIONS_CHANNEL_ID,
+                MONOPOLY_ROLE_ID,
+                GIVEAWAY_CHANNEL_ID,
+                TAX_CHANNEL_ID,
+                ROLLS_HISTORY_CHANNEL_ID,
+                COMMANDS_CHANNEL_ID,
+                REDEEM_CHANNEL_ID,
+                RULES_CHANNEL_ID,
+                RUMBLE_CHANNEL_ID
+            )
+        )
+        await db.commit()
+
+    # --- Post rules only if not already posted ---
+    rules_channel = channel_objects["rules_channel"]
+    existing_messages = [msg async for msg in rules_channel.history(limit=100) if msg.author == guild.me]
+    rules_already_posted = any(
+        msg.embeds and msg.embeds[0].title == "🛰️ Aaron Jay's Monopoly — Rules"
+        for msg in existing_messages
+    )
+
+    if not rules_already_posted:
+        for embed in get_monopoly_rules_embeds(
+                guild=guild,
+                join_channel=channel_objects.get("join_channel"),
+                monopoly_role=monopoly_role
+        ):
+            await rules_channel.send(embed=embed)
+
+    # --- Post Join Button only if not already posted ---
+    join_channel = channel_objects["join_channel"]
+    existing_messages = [msg async for msg in join_channel.history(limit=100) if msg.author == guild.me]
+    join_already_posted = any(
+        msg.embeds and "Click the button below to receive" in msg.embeds[0].description
+        for msg in existing_messages
+    )
+
+    if not join_already_posted:
+        join_embed = discord.Embed(
+            title="📡 Join Monopoly",
+            description=(
+                f"Welcome to Aaron Jay's Monopoly Game.\n\n"
+                f"Click the button below to receive <:coin:1418612412885635206> **${STARTING_COINS:,.2f} Coins** "
+                "and unlock Monopoly access."
+            ),
+            color=0x3498DB
+        )
+        await join_channel.send(embed=join_embed, view=JoinView())
+
+    await interaction.followup.send("✅ Monopoly channels setup successfully.", ephemeral=True)
+    asyncio.create_task(start_daily_giveaway())
+
+    # Channels that should be read-only
+    read_only_channel_objects = [
+        "join_channel",
+        "giveaway_channel",
+        "tx_channel",
+        "tax_channel",
+        "rules_channel",
+        "redeem_channel",
+        "rolls_history_channel",
+        "rumble_channel"
+    ]
+
+    for ch_key in read_only_channel_objects:
+        channel = channel_objects[ch_key]
+
+        # Deny everyone from sending messages
+        await channel.set_permissions(
+            guild.default_role,
+            send_messages=False,
+            add_reactions=False
+        )
+
+        # Deny Monopoly role from sending messages
+        if MONOPOLY_ROLE_ID:
+            role = guild.get_role(MONOPOLY_ROLE_ID)
+            if role:
+                await channel.set_permissions(
+                    role,
+                    send_messages=False
+                )
+
+        # Allow bot to send messages
+        await channel.set_permissions(
+            guild.me,
+            send_messages=True,
+            manage_messages=True
+        )
+
+    # Channels where players should be able to chat
+    interactive_channels = [
+        "roll_channel",
+        "commands_channel"
+    ]
+
+    for ch_key in interactive_channels:
+        channel = channel_objects[ch_key]
+
+        # Allow everyone to send messages
+        await channel.set_permissions(
+            guild.default_role,
+            send_messages=True
+        )
+
+        # Allow Monopoly role to send messages
+        if MONOPOLY_ROLE_ID:
+            role = guild.get_role(MONOPOLY_ROLE_ID)
+            if role:
+                await channel.set_permissions(
+                    role,
+                    send_messages=True
+                )
+
+        # Ensure bot can manage messages
+        await channel.set_permissions(
+            guild.me,
+            send_messages=True,
+            manage_messages=True
+        )
+
+
+async def load_monopoly_role():
+    global MONOPOLY_ROLE_ID
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT monopoly_role_id FROM monopoly_channels WHERE guild_id = ?", (GUILD_ID,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                MONOPOLY_ROLE_ID = row[0]
+
+async def load_monopoly_channels():
+    global JOIN_CHANNEL_ID, GIVEAWAY_CHANNEL_ID, ROLL_CHANNEL_ID, ROLLS_HISTORY_CHANNEL_ID
+    global MONOPOLY_TRANSACTIONS_CHANNEL_ID, TAX_CHANNEL_ID, REDEEM_CHANNEL_ID, RULES_CHANNEL_ID
+    global COMMANDS_CHANNEL_ID, MONOPOLY_ROLE_ID
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT * FROM monopoly_channels WHERE guild_id = ?", (GUILD_ID,)) as cursor:
+            row = await cursor.fetchone()
+
+    if row:
+        ROLL_CHANNEL_ID = row[1]
+        JOIN_CHANNEL_ID = row[2]
+        MONOPOLY_TRANSACTIONS_CHANNEL_ID = row[3]
+        MONOPOLY_ROLE_ID = row[4]
+        GIVEAWAY_CHANNEL_ID = row[5]
+        TAX_CHANNEL_ID = row[6]
+        ROLLS_HISTORY_CHANNEL_ID = row[7]
+        COMMANDS_CHANNEL_ID = row[8]
+        REDEEM_CHANNEL_ID = row[9]
+        RULES_CHANNEL_ID = row[10]
+
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error):
+
+    if isinstance(error, app_commands.CheckFailure):
+        message = "❌ You cannot use this command in this channel."
+    else:
+        message = f"⚠️ Error: {error}"
+
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+    except Exception as e:
+        print(f"[ERROR HANDLER FAILED] {e}")
+
 
 @bot.tree.command(name="view_board")
 async def aj_booard(interaction: discord.Interaction):
@@ -3483,6 +4159,115 @@ async def aj_board2(interaction: discord.Interaction, attachment: discord.Attach
     await attachment.save(DB_PATH)
     await interaction.response.send_message("✅ Database replaced successfully.", ephemeral=True)
 
+class JoinView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)  # ✅ REQUIRED for persistence
+
+    @discord.ui.button(
+        label="Join Aaron Jay's Monopoly",
+        style=discord.ButtonStyle.success,
+        emoji="📡",
+        custom_id="initialize_wallet_button"  # ✅ REQUIRED
+    )
+    async def join_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+
+        if interaction.response.is_done():
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                    "SELECT 1 FROM players WHERE guild_id=? AND user_id=?",
+                    (interaction.guild_id, interaction.user.id)
+            ) as cursor:
+                existing = await cursor.fetchone()
+
+            if existing:
+                await interaction.followup.send(
+                    "⚠️ You already have a Monopoly Role!",
+                    ephemeral=True
+                )
+                return
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO players (guild_id, user_id, username, coins, position, jailed_until, last_roll) "
+                "VALUES (?, ?, ?, ?, 0, 0, 0)",
+                (interaction.guild_id, interaction.user.id, str(interaction.user), STARTING_COINS)
+            )
+            await db.execute(
+                "UPDATE players SET username=? WHERE guild_id=? AND user_id=?",
+                (str(interaction.user), interaction.guild_id, interaction.user.id)
+            )
+            await db.commit()
+
+        # 🎭 Assign Monopoly role
+        role = discord.utils.get(interaction.guild.roles, name="🎩 🇲‌🇴‌🇳‌🇴‌🇵‌🇴‌🇱‌🇾‌")
+        if role:
+            try:
+                await interaction.user.add_roles(role, reason="Joined Monopoly game")
+            except Exception as e:
+                print(f"Role assign error: {e}")
+        else:
+            print("Monopoly role not found!")
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                    "SELECT roll_channel_id, giveaway_channel_id FROM monopoly_channels WHERE guild_id = ?", (interaction.guild.id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if not row:
+                    await interaction.followup.send("❌ Roll channel not found. Contact an admin.", ephemeral=True)
+                    return
+                roll_channel_id = row[0]
+                giveaway_channel_id = row[1]
+
+        roll_channel = interaction.guild.get_channel(roll_channel_id)
+        giveaway_channel = interaction.guild.get_channel(giveaway_channel_id)
+
+        roll_mention = roll_channel.mention if roll_channel else "`Roll Channel Not Set`"
+        giveaway_mention = giveaway_channel.mention if giveaway_channel else "`Giveaway Channel Not Set`"
+
+        await interaction.followup.send(
+            f"✅ Monopoly Role Granted!\n"
+            f"💰 You received <:coin:1418612412885635206> ${STARTING_COINS:,.2f} Coins.\n"
+            f"You can now join {giveaway_mention} and do Rolls in {roll_mention} if you have free rolls.",
+            ephemeral=True
+        )
+
+        # --- Fetch transaction channel from DB ---
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                    "SELECT transactions_channel_id FROM monopoly_channels WHERE guild_id = ?",
+                    (interaction.guild.id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+        if not row or not row[0]:
+            print("Transactions channel not found in DB!")
+            return
+
+        tx_channel = interaction.guild.get_channel(row[0])
+
+        if not tx_channel:
+            print("Transactions channel ID invalid!")
+            return
+
+        # --- Send log embed ---
+        embed = discord.Embed(
+            title="🛰️ Monopoly — Player Registered",
+            description=(
+                f"{interaction.user.mention} joined the Monopoly Game!\n"
+                f"💰 Starting Balance: <:coin:1418612412885635206> "
+                f"**${STARTING_COINS:,.2f} Coins**"
+            ),
+            color=discord.Color.blue()
+        )
+
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+
+        await tx_channel.send(embed=embed)
 
 @bot.tree.command(name="gtb_startingbalance", description="Set the starting balance for West GTB")
 @commands.has_permissions(administrator=True)
@@ -3508,6 +4293,7 @@ async def gtb_startingbalance(interaction: discord.Interaction, balance: float):
         embed=embed,
         allowed_mentions=discord.AllowedMentions(roles=True)
     )
+
 
 @bot.tree.command(name="gtb_startguessing", description="Open GTB guessing for West")
 @commands.has_permissions(administrator=True)
@@ -3600,7 +4386,8 @@ async def gtb_winner(interaction: discord.Interaction):
 
     # Update winner in DB
     cursor.execute("UPDATE gtb_guesses SET winner = 0")
-    cursor.execute("UPDATE gtb_guesses SET winner = 1, username = ? WHERE user_id = ?", (winner.display_name, winner.id))
+    cursor.execute("UPDATE gtb_guesses SET winner = 1, username = ? WHERE user_id = ?",
+                   (winner.display_name, winner.id))
     conn.commit()
 
     # Create embed
@@ -3615,6 +4402,7 @@ async def gtb_winner(interaction: discord.Interaction):
     embed.set_thumbnail(url=winner.display_avatar.url)
 
     await interaction.channel.send(embed=embed)
+
 
 @bot.tree.command(name="gtb_reset", description="Reset all GTB data")
 @commands.has_permissions(administrator=True)
@@ -3641,6 +4429,7 @@ was_live = False
 stream_start_time = None
 peak_viewers = 0
 
+
 class KickLiveView(discord.ui.View):
     def __init__(self, kick_username: str, button_label: str = "Watch Aaron Live on Kick"):
         super().__init__(timeout=None)
@@ -3654,12 +4443,14 @@ class KickLiveView(discord.ui.View):
             )
         )
 
+
 def is_valid_image_url(url: str) -> bool:
     """Check if a URL is a valid image link (jpg, png, gif, webp) anywhere in the URL."""
     if not url or not isinstance(url, str):
         return False
     return any(ext in url.lower() for ext in (".png", ".jpg", ".jpeg", ".gif", ".webp"))
-    
+
+
 @tasks.loop(seconds=10)
 async def check_stream():
     global was_live, stream_start_time, peak_viewers
@@ -3701,7 +4492,8 @@ async def check_stream():
             if is_valid_image_url(thumbnail):
                 embed.set_thumbnail(url=thumbnail)
             else:
-                embed.set_image(url="https://cdn.discordapp.com/attachments/1353382950300811394/1450100847357984799/Aaron_Jay.png?ex=69488f67&is=69473de7&hm=9f0707bd0756ce264c5ef1bc4d7374957fc22468d8c5b66af08f223cbd1e5222")
+                embed.set_image(
+                    url="https://cdn.discordapp.com/attachments/1353382950300811394/1450100847357984799/Aaron_Jay.png?ex=69488f67&is=69473de7&hm=9f0707bd0756ce264c5ef1bc4d7374957fc22468d8c5b66af08f223cbd1e5222")
 
             content = (
                 f"<@&{LIVE_ROLE_ID}>\n"
@@ -3771,7 +4563,6 @@ def get_affiliate_summary(date: str) -> dict:
 
     url = f"{os.getenv('AFFILIATE_API_BASE').rstrip('/')}/affiliates/detailed-summary/v2/{date}"
 
-
     headers = {
         "Authorization": f"Bearer {os.getenv('AFFILIATE_API_TOKEN')}",
         "Accept": "application/json"
@@ -3811,6 +4602,7 @@ async def affiliate_summary(interaction: discord.Interaction, date: str):
     embed.add_field(name="🏦 Commission", value=f"${data.get('commission', 0):,.2f}")
 
     await interaction.followup.send(embed=embed)
+
 
 # Function to fetch cumulative referral stats (REAL endpoint)
 def get_total_referrals() -> list:
@@ -3877,6 +4669,7 @@ async def referral_leaderboard(interaction: discord.Interaction):
 
     await interaction.followup.send(embed=embed)
 
+
 AUTO_MESSAGE = (
     "@everyone\n\n"
     "💚 **THANK YOU FOR THE SUPPORT!** 💚\n\n"
@@ -3896,8 +4689,8 @@ AUTO_MESSAGE = (
     "Every signup, follow, and bit of support helps grow the community 💚"
 )
 
-
 LB_CHANNEL_ID = 1158852103863795723
+
 
 @tasks.loop(hours=168)
 async def auto_reminder():
@@ -3906,6 +4699,7 @@ async def auto_reminder():
         channel = await bot.fetch_channel(LB_CHANNEL_ID)
 
     await channel.send(AUTO_MESSAGE)
+
 
 @auto_reminder.before_loop
 async def before_auto_reminder():
@@ -3916,6 +4710,7 @@ async def before_auto_reminder():
         channel = await bot.fetch_channel(LB_CHANNEL_ID)
 
     await channel.send(AUTO_MESSAGE)  # 👈 send immediately on startup
+
 
 # All jokes
 JOKES = [
@@ -3961,6 +4756,7 @@ JOKES = [
 joke_queue = JOKES.copy()
 random.shuffle(joke_queue)
 
+
 @tasks.loop(hours=48)
 async def send_jokes():
     global joke_queue
@@ -3977,7 +4773,8 @@ async def send_jokes():
         joke_queue = JOKES.copy()
         random.shuffle(joke_queue)
         print("🔄 All jokes sent, reshuffling the queue.")
-        
+
+
 @send_jokes.before_loop
 async def before_send_jokes():
     await bot.wait_until_ready()
@@ -3985,6 +4782,7 @@ async def before_send_jokes():
 
 
 NS = {'s': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+
 
 # ====== FETCH ======
 def get_existing_slot_urls():
@@ -3994,6 +4792,7 @@ def get_existing_slot_urls():
     urls = {row[0] for row in c.fetchall()}  # set for fast lookup
     conn.close()
     return urls
+
 
 def get_all_slot_urls():
     """Fetch all /free-slots/ URLs from sitemap, skipping URLs already in DB"""
@@ -4103,6 +4902,7 @@ def update_db(slot_data):
     conn.commit()
     conn.close()
 
+
 # ====== MAIN SCRAPER ======
 def scrape_and_update():
     print("Fetching all slot URLs from sitemap...")
@@ -4118,8 +4918,8 @@ def scrape_and_update():
 
     print("Scraping complete.")
 
-def increment_provider_usage(provider):
 
+def increment_provider_usage(provider):
     if provider == "ALL":
         return  # don't track ALL
 
@@ -4135,6 +4935,7 @@ def increment_provider_usage(provider):
 
     conn.commit()
     conn.close()
+
 
 async def provider_autocomplete(interaction: discord.Interaction, current: str):
     conn = sqlite3.connect(DB_PATH)
@@ -4175,7 +4976,6 @@ class ProviderView(discord.ui.View):
 
 
 async def send_random_slot(interaction, provider_value):
-
     # Track usage
     increment_provider_usage(provider_value)
 
@@ -4223,6 +5023,7 @@ async def send_random_slot(interaction, provider_value):
         content=f"{interaction.user.mention} Here’s your random slot!",
         embed=embed
     )
+
 
 def get_providers_by_usage(limit=24):
     """
@@ -4314,6 +5115,7 @@ async def random_slot(interaction: discord.Interaction, provider: str):
         ephemeral=True
     )
 
+
 # ================= SLOT CALL COMMAND =================
 
 def get_top_slots(limit=25):
@@ -4331,6 +5133,7 @@ def get_top_slots(limit=25):
     slots = c.fetchall()
     conn.close()
     return slots
+
 
 async def slot_autocomplete(interaction: discord.Interaction, current: str):
     """Autocomplete for slot names"""
@@ -4353,6 +5156,7 @@ async def slot_autocomplete(interaction: discord.Interaction, current: str):
         for slot in slots
     ]
 
+
 def increment_slot_usage(slot_name):
     """Track how many times each slot was called"""
     conn = sqlite3.connect(DB_PATH)
@@ -4371,6 +5175,7 @@ def increment_slot_usage(slot_name):
     """, (slot_name,))
     conn.commit()
     conn.close()
+
 
 async def send_slot_call(interaction: discord.Interaction, slot_value: str):
     """Send the slot call embed"""
@@ -4405,6 +5210,7 @@ async def send_slot_call(interaction: discord.Interaction, slot_value: str):
         embed=embed
     )
 
+
 # 🔄 AUTO SLOT SCRAPER LOOP
 @tasks.loop(hours=24)  # change interval if you want
 async def auto_scrape_slots():
@@ -4424,11 +5230,13 @@ async def auto_scrape_slots():
 
     print("✅ Auto scrape cycle complete.")
 
+
 # Wait until bot is ready before first run
 @auto_scrape_slots.before_loop
 async def before_auto_scrape():
     await bot.wait_until_ready()
     print("⏳ Auto slot scraper waiting for bot ready...")
+
 
 # ================= DISCORD COMMAND =================
 @bot.tree.command(
@@ -4437,7 +5245,6 @@ async def before_auto_scrape():
 @app_commands.describe(slot="Pick a slot to call")
 @app_commands.autocomplete(slot=slot_autocomplete)
 async def slot_call(interaction: discord.Interaction, slot: str):
-
     if interaction.channel_id != CALL_CHANNEL_ID:
         await interaction.response.send_message(
             f"⚠️ You can’t use that command here! Please go to <#{CALL_CHANNEL_ID}> to use `/slot_call`.",
@@ -4462,9 +5269,15 @@ async def background_scrape():
 
     print("Background scraping complete.")
 
+
 @bot.event
 async def on_ready():
     print("🤖 Bot ready — starting Kick checker", flush=True)
+
+    bot.already_ready = True
+    bot.add_view(JoinView())
+    await load_monopoly_channels()
+    await load_monopoly_role()
     await init_db()
     if not os.path.exists(BOARD_IMAGE_PATH):
         os.makedirs(ASSETS_DIR, exist_ok=True)
@@ -4491,7 +5304,7 @@ async def on_ready():
 
         today = date.today().isoformat()
         async with db.execute(
-            "SELECT guild_id, message_id, giveaway_date FROM daily_giveaway"
+                "SELECT guild_id, message_id, giveaway_date FROM daily_giveaway"
         ) as cur:
             rows = await cur.fetchall()
 
@@ -4509,8 +5322,8 @@ async def on_ready():
             # ✅ Restore entries from DB
             async with aiosqlite.connect(DB_PATH) as db:
                 async with db.execute(
-                    "SELECT user_id FROM giveaway_entries WHERE guild_id=? AND message_id=?",
-                    (guild_id, message_id)
+                        "SELECT user_id FROM giveaway_entries WHERE guild_id=? AND message_id=?",
+                        (guild_id, message_id)
                 ) as cur:
                     user_rows = await cur.fetchall()
                 for (uid,) in user_rows:
@@ -4528,7 +5341,9 @@ async def on_ready():
 
     # Start daily giveaway scheduler
     if not daily_giveaway_scheduler.is_running():
-        asyncio.create_task(scheduler_once())
+        daily_giveaway_scheduler.start()
+
+    asyncio.create_task(check_and_draw_missed_giveaways())
 
     # Start the slot tax loop
     if not collect_slot_owner_tax.is_running():
@@ -4542,11 +5357,11 @@ async def on_ready():
         print("✅ Slash commands synced.")
     except Exception as e:
         print(f"❌ Sync error: {e}")
-    
+
     if not check_stream.is_running():
         check_stream.start()
         print("▶️ Kick stream checker started")
-        
+
     if not auto_reminder.is_running():
         auto_reminder.start()
 
@@ -4556,15 +5371,104 @@ async def on_ready():
     if not auto_scrape_slots.is_running():
         auto_scrape_slots.start()
         print("▶️ Auto slot scraper started (6h loop)")
-    
+
+
 async def load_extensions():
     await bot.load_extension("cogs.affiliate")
-    
+
+
 @bot.event
 async def on_message(message: discord.Message):
     if message.author.bot:
         return
-  
+
+        # Fetch roll channel ID from DB
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+                "SELECT roll_channel_id FROM monopoly_channels WHERE guild_id=?",
+                (message.guild.id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return  # No roll channel set
+            roll_channel_id = row[0]
+
+        # Only restrict messages in the roll channel
+    if message.channel.id == roll_channel_id:
+        # Allow slash commands only (ignore messages starting with "/")
+        if not message.content.startswith("/monopoly_roll"):
+            try:
+                await message.delete()
+            except:
+                pass
+            warning_msg = await message.channel.send(
+                f"❌ Only `/monopoly_roll` command is allowed in this channel, {message.author.mention}.",
+            )
+            # Auto-delete warning after 5-7 seconds
+            await asyncio.sleep(6)
+            await warning_msg.delete()
+            return
+
+        # Fetch command channel ID
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+                "SELECT commands_channel_id FROM monopoly_channels WHERE guild_id=?",
+                (message.guild.id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row or not row[0]:
+                return
+            commands_channel_id = row[0]
+
+    if message.channel.id == commands_channel_id:
+        # If the message is not a slash command, delete it
+        if not message.content.startswith("/"):
+            try:
+                await message.delete()
+            except discord.Forbidden:
+                pass  # no permission to delete
+
+            # Send ephemeral-like message
+            try:
+                await message.channel.send(
+                    f"{message.author.mention} ⚠️ Only the following commands are allowed here:\n"
+                    + "\n".join(f"/{cmd}" for cmd in ALLOWED_COMMANDS),
+                    delete_after=8  # deletes automatically after 8 seconds
+                )
+            except:
+                pass
+
+    # Channels to enforce bot-only posting
+    read_only_ids = [
+        RULES_CHANNEL_ID,
+        REDEEM_CHANNEL_ID,
+        JOIN_CHANNEL_ID,
+        GIVEAWAY_CHANNEL_ID,
+        MONOPOLY_TRANSACTIONS_CHANNEL_ID,
+        TAX_CHANNEL_ID,
+        ROLLS_HISTORY_CHANNEL_ID
+    ]
+
+    # Filter None just in case
+    read_only_ids = [ch_id for ch_id in read_only_ids if ch_id]
+
+    # If message is in a read-only channel, delete immediately
+    if message.channel.id in read_only_ids:
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            print(f"⚠️ Missing permission to delete message in {message.channel.name}")
+
+        # DM user that they can't post (optional)
+        try:
+            await message.author.send(
+                f"❌ You cannot send messages in {message.channel.mention}. Only the bot can post here."
+            )
+        except:
+            pass  # ignore if user DMs are closed
+
+        return  # stop processing commands in read-only channels
+
     # Only enforce for messages in the restricted channels
     if message.channel.id == ASK_CHANNEL_ID:
         # Check if the message is not invoking /random_slot
@@ -4590,7 +5494,7 @@ async def on_message(message: discord.Message):
             except discord.Forbidden:
                 print("Missing permissions to delete message")
             return
-            
+
     # ✅ Kick username verification
     if message.channel.id == 1419716547643052042:
         new_nick = message.content.strip()
@@ -4663,6 +5567,7 @@ async def on_message(message: discord.Message):
 
     # ✅ Always call this at the very end
     await bot.process_commands(message)
+
 
 # Run the bot
 if __name__ == "__main__":
