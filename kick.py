@@ -3827,9 +3827,7 @@ def get_monopoly_rules_embeds(
 
 @bot.tree.command(
     name="monopoly_setup",
-    description="Create all Monopoly channels safely (handles missing or renamed channels)",
-    guild=discord.Object(id=GUILD_ID)
-)
+    description="Create all Monopoly channels safely (handles missing or renamed channels)")
 async def monopoly_setup(interaction: discord.Interaction):
     if interaction.user.id != ADMIN_ID:
         await interaction.response.send_message("❌ You are not allowed to use this command.", ephemeral=True)
