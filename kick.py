@@ -3008,7 +3008,7 @@ async def collect_slot_owner_tax():
             # 2️⃣ Transaction Log Channel Message (With Updated Balances)
             log_lines = [
                 f"📑 <@{uid}>: -**${total:,.2f}** fee | 💳 **Balance: ${bal:,.2f}**"
-                for uid, count, base, idle, total, bal in tax_details
+                for uid, count, base, idle, total in tax_details
             ]
             log_breakdown = "\n".join(log_lines) if log_lines else "No transactions processed."
 
@@ -3065,10 +3065,10 @@ async def before_tax_loop():
     now = datetime.now(timezone.utc)  # ✅ Get current time in UTC
 
     # 🔥 Change target_day from 0 (Monday) to 1 (Tuesday)
-    target_day = 0  # 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
+    target_day = 1  # 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
     days_ahead = (target_day - now.weekday()) % 7
     next_target = now + timedelta(days=days_ahead)
-    next_target = next_target.replace(hour=0, minute=00, second=00, microsecond=0)
+    next_target = next_target.replace(hour=1, minute=25, second=00, microsecond=0)
 
     wait_seconds = (next_target - now).total_seconds()
     print(f"⏳ Waiting {wait_seconds / 3600:.2f} hours until first tax collection...")
