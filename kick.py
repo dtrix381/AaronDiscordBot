@@ -2956,7 +2956,7 @@ async def collect_slot_owner_tax():
                         db, guild_id, user_id, -total_tax,
                         f"Weekly Slot Owner Tax (10% + {days_since_roll} days inactivity = {inactivity_tax} Coins)"
                     )
-                    tax_details.append((user_id, prop_count, tax, inactivity_tax, total_tax))
+                    tax_details.append((user_id, prop_count, tax, inactivity_tax, total_tax, new_balance))
                 else:
                     # ❌ Player cannot pay → Repo all properties
                     await db.execute(
@@ -2981,7 +2981,7 @@ async def collect_slot_owner_tax():
 
                     slot_names = [sq["name"] for sq in SLOT_BOARD if sq["idx"] in owned_idxs]
                     repossessed.append((user_id, slot_names))
-                    tax_details.append((user_id, prop_count, tax, inactivity_tax, total_tax))
+                    tax_details.append((user_id, prop_count, tax, inactivity_tax, total_tax, new_balance))
 
             # Update total prize pool
             await db.execute(
@@ -3068,7 +3068,7 @@ async def before_tax_loop():
     target_day = 1  # 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
     days_ahead = (target_day - now.weekday()) % 7
     next_target = now + timedelta(days=days_ahead)
-    next_target = next_target.replace(hour=1, minute=45, second=0, microsecond=0)
+    next_target = next_target.replace(hour=1, minute=55, second=0, microsecond=0)
 
     wait_seconds = (next_target - now).total_seconds()
     print(f"⏳ Waiting {wait_seconds / 3600:.2f} hours until first tax collection...")
