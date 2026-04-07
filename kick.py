@@ -3002,15 +3002,15 @@ async def collect_slot_owner_tax():
 
             # Build message
             breakdown_lines = [
-                f"• <@{uid}> validates **{count} NFTs** — paid <:monopoly:1476164298005938258> **${total:,.2f}** "
-                f"(**Base:** ${base:,.2f} + **Latency:** ${idle:,.2f})"
+                f"• <@{uid}> owns **{count} slots** — paid <:coin:1418612412885635206> **${total:,} Coins** "
+                f"(**Tax:** ${base:,} + **Inactivity:** ${idle:,})"
                 for uid, count, base, idle, total, bal in tax_details
             ]
             breakdown_msg = "\n".join(breakdown_lines) if breakdown_lines else "No slot owners were taxed this week."
 
             # 2️⃣ Transaction Log Channel Message (With Updated Balances)
             log_lines = [
-                f"📑 <@{uid}>: -**${total:,.2f}** fee | 💳 **Balance: ${bal:,.2f}**"
+                f"📑 <@{uid}>: <:coin:1418612412885635206> -**${total:,.2f}** fee | 💳 **Balance: <:coin:1418612412885635206> ${bal:,.2f}**"
                 for uid, count, base, idle, total, bal in tax_details
             ]
             log_breakdown = "\n".join(log_lines) if log_lines else "No transactions processed."
@@ -3071,7 +3071,7 @@ async def before_tax_loop():
     target_day = 1  # 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
     days_ahead = (target_day - now.weekday()) % 7
     next_target = now + timedelta(days=days_ahead)
-    next_target = next_target.replace(hour=2, minute=7, second=0, microsecond=0)
+    next_target = next_target.replace(hour=2, minute=18, second=0, microsecond=0)
 
     wait_seconds = (next_target - now).total_seconds()
     print(f"⏳ Waiting {wait_seconds / 3600:.2f} hours until first tax collection...")
