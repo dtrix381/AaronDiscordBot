@@ -1484,7 +1484,7 @@ async def process_landing(interaction, db, player_row, roll, double_rent: bool =
                 title="🎴 Gamble Card — Advance to Olympus!",
                 description=(
                     f"⚡ By Ze Zeus’s blessing, {user.mention} advances to **Gates of Olympus**!\n"
-                    f"{'💰 Collected: <:coin:1418612412885635206> **$200 Coins** for Passing **GO**\n' if reward else ''}"
+                    f"{'💰 Collected: <:coin:1418612412885635206> **$200 Coins** for Passing **GO**' if reward else ''}\n"
                     f"💳 Updated Balance: <:coin:1418612412885635206> **${new_bal:,.2f} Coins**"
                 ),
                 color=discord.Color.gold()
