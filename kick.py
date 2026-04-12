@@ -35,10 +35,6 @@ import sqlite3
 # Load .env file locally
 load_dotenv()
 
-# ===================== CONFIG =====================
-TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-if not TOKEN:
-    raise SystemExit("❌ DISCORD_BOT_TOKEN is not set in environment variables.")
 
 DB_PATH = "/data/aaronjay.db"
 
