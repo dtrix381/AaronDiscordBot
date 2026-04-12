@@ -1,0 +1,23 @@
+{
+  "emojis": {
+    "coin": "https://cdn.discordapp.com/emojis/1418612841359081643.png"
+  },
+  "weekly": {
+    "title": "Weekly Giveaway",
+    "prize": "0",
+    "thumbnail": "https://www.teamfullsendslots.com/assets/TFS2.png",
+    "end_time": null,
+    "history": [],
+    "last_winner": null,
+    "last_entries": 0
+  },
+  "monthly": {
+    "title": "Monthly Giveaway",
+    "prize": "0",
+    "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR_Y9YnVQm6TFG7800XtZPWeJNDvnFl01gssg&s",
+    "end_time": null,
+    "history": [],
+    "last_winner": null,
+    "last_entries": 0
+  }
+}
