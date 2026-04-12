@@ -5570,6 +5570,4 @@ async def on_message(message: discord.Message):
     await bot.process_commands(message)
 
 
-# Run the bot
-if __name__ == "__main__":
-    bot.run(TOKEN)
+
