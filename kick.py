@@ -35,6 +35,10 @@ import sqlite3
 # Load .env file locally
 load_dotenv()
 
+# ===================== CONFIG =====================
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+if not TOKEN:
+    raise SystemExit("❌ DISCORD_BOT_TOKEN is not set in environment variables.")
 
 DB_PATH = "/data/aaronjay.db"
 
@@ -1483,10 +1487,9 @@ async def process_landing(interaction, db, player_row, roll, double_rent: bool =
             embed = discord.Embed(
                 title="🎴 Gamble Card — Advance to Olympus!",
                 description=(
-                        f"⚡ By Ze Zeus’s blessing, {user.mention} advances to **Gates of Olympus**!\n"
-                        + (
-                            "💰 Collected: <:coin:1418612412885635206> **$200 Coins** for Passing **GO**\n" if reward else "")
-                        + f"💳 Updated Balance: <:coin:1418612412885635206> **${new_bal:,.2f} Coins**"
+                    f"⚡ By Ze Zeus’s blessing, {user.mention} advances to **Gates of Olympus**!\n"
+                    f"{'💰 Collected: <:coin:1418612412885635206> **$200 Coins** for Passing **GO**\n' if reward else ''}"
+                    f"💳 Updated Balance: <:coin:1418612412885635206> **${new_bal:,.2f} Coins**"
                 ),
                 color=discord.Color.gold()
             )
@@ -1586,10 +1589,10 @@ async def process_landing(interaction, db, player_row, roll, double_rent: bool =
             embed = discord.Embed(
                 title="🎴 Gamble Card — Advance to Zombie Carnival!",
                 description=(
-    f"🧟 Rotten zombie hordes drag {user.mention} into **Zombie Carnival**!\n"
-    + ("💰 Collected: <:coin:1418612412885635206> **$200 Coins** for Passing **GO**\n" if reward else "")
-    + f"💳 Updated Balance: <:coin:1418612412885635206> **${new_bal:,.2f} Coins**"
-),
+                    f"🧟 Rotten zombie hordes drag {user.mention} into **Zombie Carnival**!\n"
+                    f"{'💰 Collected: <:coin:1418612412885635206> **$200 Coins** for Passing **GO**\n' if reward else ''}"
+                    f"💳 Updated Balance: <:coin:1418612412885635206> **${new_bal:,.2f} Coins**"
+                ),
                 color=discord.Color.gold()
             )
 
@@ -5565,3 +5568,8 @@ async def on_message(message: discord.Message):
 
     # ✅ Always call this at the very end
     await bot.process_commands(message)
+
+
+# Run the bot
+if __name__ == "__main__":
+    bot.run(TOKEN)
