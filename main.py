@@ -1,5 +1,6 @@
-from tfs import bot as tfs_bot
-from kick import bot as kick_bot  # your other bot
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import asyncio
 import os
