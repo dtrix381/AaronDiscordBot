@@ -1586,7 +1586,7 @@ async def process_landing(interaction, db, player_row, roll, double_rent: bool =
                 title="🎴 Gamble Card — Advance to Zombie Carnival!",
                 description=(
                     f"🧟 Rotten zombie hordes drag {user.mention} into **Zombie Carnival**!\n"
-                    f"{'💰 Collected: <:coin:1418612412885635206> **$200 Coins** for Passing **GO**\n' if reward else ''}"
+                    f"{'💰 Collected: <:coin:1418612412885635206> **$200 Coins** for Passing **GO** if reward else ''}\n'"
                     f"💳 Updated Balance: <:coin:1418612412885635206> **${new_bal:,.2f} Coins**"
                 ),
                 color=discord.Color.gold()
