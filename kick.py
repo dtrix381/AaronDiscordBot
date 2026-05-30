@@ -196,7 +196,7 @@ SLOT_BOARD: List[Dict] = [
      "image": "images/26.png"},
     {"idx": 27, "type": "property", "name": "Cursed Seas", "price": 220, "rent": 39.6, "group": "yellow",
      "image": "images/27.png"},
-    {"idx": 28, "type": "utility", "name": "Mental", "price": 150, "rent": 4, "group": "utility",
+    {"idx": 28, "type": "utility", "name": "Beast Below", "price": 150, "rent": 4, "group": "utility",
      "image": "images/28.png"},
     {"idx": 29, "type": "property", "name": "Fighter Pit", "price": 240, "rent": 40.8, "group": "yellow",
      "image": "images/29.png"},
@@ -259,7 +259,7 @@ GAMBLE_CARDS = [
     },
     {
         "name": "Advance to Nearest Utility Realm — Madame Destiny’s Prophecy",
-        "desc": "Madame Destiny declares: 'Fate guides you onward — whether to Money Train’s rails of fortune or the halls of madness in Mental! If free, claim it. If owned, roll dice ×10 Coins as destiny’s toll.'",
+        "desc": "Madame Destiny declares: 'Fate guides you onward — whether to Money Train’s rails of fortune or Beast Below’s sunken treasures!! If free, claim it. If owned, roll dice ×10 Coins as destiny’s toll.'",
         "effect": "nearest_utility",
         "image": "images/madame_destiny.png"
     },
@@ -1707,7 +1707,7 @@ async def process_landing(interaction, db, player_row, roll, double_rent: bool =
             embed = discord.Embed(
                 title="🎴 Gamble Card — Advance to Nearest Utility!",
                 description=(
-                    f"🔮 Madame Destiny declares: '{user.mention}, Fate guides you onward — whether to **Money Train’s** rails of fortune or the halls of madness in **Mental**! If free, claim it. If owned, roll dice ×10 <:coin:1418612412885635206> Coins as destiny’s toll.!'\n"
+                    f"🔮 Madame Destiny declares: '{user.mention}, Fate guides you onward — whether to **Money Train’s** rails of fortune or the halls of madness in **Beast Below’s** sunken treasures!! If free, claim it. If owned, roll dice ×10 <:coin:1418612412885635206> Coins as destiny’s toll.!'\n"
                     f"You advance to **Tile {target_idx}**."
                 ),
                 color=discord.Color.purple()
