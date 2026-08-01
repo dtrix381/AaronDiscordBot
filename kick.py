@@ -105,6 +105,424 @@ POLITE_DELAY = (1.0, 2.5)
 ASK_CHANNEL_ID = 1470361281285324821
 CALL_CHANNEL_ID = 1470361355105075366
 
+# ===================== STAKE WATCHER =====================
+
+STAKE_API_TOKEN = os.getenv("STAKE_API_TOKEN")
+
+STAKE_GUILD_ID = 1158852103268225104      # Your Discord server
+STAKE_CHANNEL_ID = 1286302069132628111    # Channel to post in
+
+CHECK_INTERVAL = 3       # seconds
+
+MIN_MULTIPLIER = 0.2     # Later change to 100
+MIN_PROFIT = 50          # USD/USDT/etc.
+
+POST_ONLY_WINS = True
+
+GRAPHQL_URL = "https://stake.com/_api/graphql"
+
+# Remember bets we've already processed
+processed_bets = set()
+
+# Keep last cleanup time
+_last_cleanup = datetime.now(timezone.utc)
+
+# ------------------------------------------------------------
+# GraphQL Query
+# ------------------------------------------------------------
+
+STAKE_QUERY = """
+query MyBetList($limit: Int = 10) {
+  user {
+    id
+    houseBetList(limit: $limit) {
+      id
+      iid
+      type
+
+      game {
+        name
+        slug
+        icon
+      }
+
+      bet {
+
+        ... on CasinoBet {
+          id
+          amount
+          payout
+          payoutMultiplier
+          amountMultiplier
+          currency
+          updatedAt
+        }
+
+        ... on SoftswissBet {
+          id
+          amount
+          payout
+          payoutMultiplier
+          currency
+          updatedAt
+        }
+
+        ... on ThirdPartyBet {
+          id
+          amount
+          payout
+          payoutMultiplier
+          currency
+          updatedAt
+        }
+
+        ... on EvolutionBet {
+          id
+          amount
+          payout
+          payoutMultiplier
+          currency
+        }
+
+      }
+
+    }
+  }
+}
+"""
+
+
+# ------------------------------------------------------------
+# Cleanup old processed IDs
+# ------------------------------------------------------------
+
+def cleanup_processed():
+
+    global _last_cleanup
+
+    now = datetime.now(timezone.utc)
+
+    if (now - _last_cleanup).total_seconds() < 600:
+        return
+
+    _last_cleanup = now
+
+    # prevent memory growing forever
+    while len(processed_bets) > 500:
+        processed_bets.pop()
+
+
+# ------------------------------------------------------------
+# Fetch latest bets
+# ------------------------------------------------------------
+
+async def fetch_latest_bets():
+
+    headers = {
+        "x-access-token": STAKE_API_TOKEN,
+        "content-type": "application/json",
+    }
+
+    payload = {
+        "query": STAKE_QUERY,
+        "variables": {
+            "limit": 10
+        }
+    }
+
+    timeout = aiohttp.ClientTimeout(total=15)
+
+    try:
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+
+            async with session.post(
+                GRAPHQL_URL,
+                headers=headers,
+                json=payload
+            ) as response:
+
+                if response.status != 200:
+                    print(f"Stake API Error: {response.status}")
+                    return []
+
+                data = await response.json()
+
+    except Exception as e:
+
+        print("Stake request failed:", e)
+
+        return []
+
+    try:
+
+        bets = data["data"]["user"]["houseBetList"]
+
+    except Exception:
+
+        return []
+
+    return bets
+
+
+# ------------------------------------------------------------
+# Parse one bet into a simple dict
+# ------------------------------------------------------------
+
+def parse_bet(entry):
+
+    bet = entry.get("bet")
+
+    if not bet:
+        return None
+
+    amount = float(bet.get("amount", 0))
+    payout = float(bet.get("payout", 0))
+    multiplier = float(bet.get("payoutMultiplier", 0))
+
+    profit = payout - amount
+
+    return {
+
+        "id": entry.get("id"),
+
+        "game_name":
+            entry.get("game", {}).get("name", "Unknown"),
+
+        "game_slug":
+            entry.get("game", {}).get("slug", ""),
+
+        "game_icon":
+            entry.get("game", {}).get("icon"),
+
+        "amount": amount,
+
+        "payout": payout,
+
+        "profit": profit,
+
+        "multiplier": multiplier,
+
+        "currency":
+            bet.get("currency", "").upper(),
+
+        "updated":
+            bet.get("updatedAt", "")
+
+    }
+
+
+# ------------------------------------------------------------
+# Decide whether to post
+# ------------------------------------------------------------
+
+def should_post(bet):
+
+    if bet is None:
+        return False
+
+    # ignore losses
+    if POST_ONLY_WINS and bet["payout"] <= 0:
+        return False
+
+    if bet["multiplier"] >= MIN_MULTIPLIER:
+        return True
+
+    if bet["profit"] >= MIN_PROFIT:
+        return True
+
+    return False
+    
+
+# ============================================================
+# STAKE WATCHER - PART 2
+# ============================================================
+
+stake_session = None
+
+
+async def get_stake_session():
+    global stake_session
+
+    if stake_session is None or stake_session.closed:
+        timeout = aiohttp.ClientTimeout(total=15)
+        stake_session = aiohttp.ClientSession(timeout=timeout)
+
+    return stake_session
+
+
+GAME_ICON_BASE = "https://stake.com/_app/immutable/assets/"
+
+
+def build_stake_embed(bet):
+
+    game = bet["game_name"].replace("-", " ").title()
+
+    embed = discord.Embed(
+        title="🎉 Big Win Detected!",
+        color=0x00ff88,
+        timestamp=datetime.now(timezone.utc)
+    )
+
+    embed.add_field(
+        name="🎰 Game",
+        value=game,
+        inline=True
+    )
+
+    embed.add_field(
+        name="💰 Bet",
+        value=f"{bet['amount']:,.4f} {bet['currency']}",
+        inline=True
+    )
+
+    embed.add_field(
+        name="🏆 Payout",
+        value=f"{bet['payout']:,.4f} {bet['currency']}",
+        inline=True
+    )
+
+    embed.add_field(
+        name="📈 Multiplier",
+        value=f"**{bet['multiplier']}x**",
+        inline=True
+    )
+
+    embed.add_field(
+        name="💵 Profit",
+        value=f"{bet['profit']:,.4f} {bet['currency']}",
+        inline=True
+    )
+
+    embed.add_field(
+        name="👤 Player",
+        value="Dtrix381",
+        inline=True
+    )
+
+    embed.set_footer(
+        text="Stake Big Win Tracker"
+    )
+
+    # We'll improve icon support later if Stake exposes icon paths.
+    if bet.get("game_icon"):
+        try:
+            embed.set_thumbnail(
+                url=GAME_ICON_BASE + bet["game_icon"]
+            )
+        except:
+            pass
+
+    return embed
+
+
+async def check_stake_big_wins():
+
+    global processed_bets
+
+    cleanup_processed()
+
+    headers = {
+        "x-access-token": STAKE_API_TOKEN,
+        "content-type": "application/json",
+    }
+
+    payload = {
+        "query": STAKE_QUERY,
+        "variables": {
+            "limit": 10
+        }
+    }
+
+    session = await get_stake_session()
+
+    try:
+
+        async with session.post(
+            GRAPHQL_URL,
+            headers=headers,
+            json=payload
+        ) as response:
+
+            if response.status != 200:
+                print("Stake:", response.status)
+                return
+
+            data = await response.json()
+
+    except Exception as e:
+
+        print("Stake watcher:", e)
+        return
+
+    try:
+
+        bets = data["data"]["user"]["houseBetList"]
+
+    except Exception:
+
+        return
+
+    guild = bot.get_guild(STAKE_GUILD_ID)
+
+    if guild is None:
+        return
+
+    channel = guild.get_channel(STAKE_CHANNEL_ID)
+
+    if channel is None:
+        return
+
+    #
+    # oldest -> newest
+    #
+    bets.reverse()
+
+    for raw in bets:
+
+        bet = parse_bet(raw)
+
+        if bet is None:
+            continue
+
+        bet_id = bet["id"]
+
+        if bet_id in processed_bets:
+            continue
+
+        processed_bets.add(bet_id)
+
+        if not should_post(bet):
+            continue
+
+        embed = build_stake_embed(bet)
+
+        try:
+
+            await channel.send(embed=embed)
+
+            print(
+                f"Posted Stake win {bet['game_name']} {bet['multiplier']}x"
+            )
+
+        except Exception as e:
+
+            print("Discord send failed:", e)
+
+
+@tasks.loop(seconds=CHECK_INTERVAL)
+async def stake_watcher():
+
+    await bot.wait_until_ready()
+
+    await check_stake_big_wins()
+
+
+@stake_watcher.before_loop
+async def before_stake_watcher():
+
+    await bot.wait_until_ready()
+    
 # Load Kick OAuth token
 KICK_TOKEN_PATH = "kick_token.json"
 KICK_OAUTH_TOKEN = None
@@ -5366,6 +5784,10 @@ async def on_ready():
     if not auto_scrape_slots.is_running():
         auto_scrape_slots.start()
         print("▶️ Auto slot scraper started (6h loop)")
+
+    if not stake_watcher.is_running():
+        stake_watcher.start()
+        print("▶️ Stake watcher started")
 
 
 async def load_extensions():
