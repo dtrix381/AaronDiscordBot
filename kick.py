@@ -466,8 +466,6 @@ async def build_stake_embed(bet):
 
     if metadata:
 
-        game_type = metadata.get("type", "")
-        
         game_data = metadata.get("data") or {}
 
         provider_data = (
@@ -478,8 +476,8 @@ async def build_stake_embed(bet):
         if provider_data.get("name"):
             provider = provider_data["name"]
 
-        elif game_type == "original":
-           provider = "Stake Originals"
+        else:
+            provider = "Stake Originals"
 
     embed = discord.Embed(
         title="🎉 Big Win!",
