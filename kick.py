@@ -438,25 +438,21 @@ async def get_game_metadata(slug):
 async def build_stake_embed(bet):
 
     metadata = await get_game_metadata(
-    bet["game_slug"]
+        bet["game_slug"]
     )
 
 
     if metadata:
 
-        game = metadata["name"]
-
-        thumbnail = metadata.get(
-            "thumbnailUrl"
+        game = metadata.get(
+            "name",
+            bet["game_name"]
         )
 
-
-        provider = (
-            metadata
-            .get("data", {})
-            .get("provider", {})
-            .get("name", "Unknown")
+        thumbnail = (
+            metadata.get("thumbnailUrl")
         )
+
 
     else:
 
@@ -464,7 +460,26 @@ async def build_stake_embed(bet):
 
         thumbnail = None
 
-        provider = "Unknown"
+
+    provider = "Unknown"
+
+
+    if metadata:
+
+        game_type = metadata.get("type", "")
+        
+        game_data = metadata.get("data") or {}
+
+        provider_data = (
+            game_data.get("provider")
+            or {}
+        )
+
+        if provider_data.get("name"):
+            provider = provider_data["name"]
+
+        elif game_type == "original":
+           provider = "Stake Originals"
 
     embed = discord.Embed(
         title="🎉 Big Win!",
