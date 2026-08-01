@@ -110,11 +110,11 @@ CALL_CHANNEL_ID = 1470361355105075366
 STAKE_API_TOKEN = os.getenv("STAKE_API_TOKEN")
 
 STAKE_GUILD_ID = 1158852103268225104      # Your Discord server
-STAKE_CHANNEL_ID = 1286302069132628111    # Channel to post in
+STAKE_CHANNEL_ID = 1158852103863795723    # Channel to post in
 
 CHECK_INTERVAL = 3       # seconds
 
-MIN_MULTIPLIER = 0.2     # Later change to 100
+MIN_MULTIPLIER = 100     # Later change to 100
 MIN_PROFIT = 50          # USD/USDT/etc.
 
 POST_ONLY_WINS = True
@@ -523,7 +523,7 @@ async def build_stake_embed(bet):
 
     embed.add_field(
         name="👤 Player",
-        value="Dtrix381",
+        value="AaronJay",
         inline=True
     )
 
