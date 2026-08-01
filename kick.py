@@ -143,7 +143,6 @@ query MyBetList($limit: Int = 10) {
       game {
         name
         slug
-        icon
       }
 
       bet {
@@ -186,6 +185,30 @@ query MyBetList($limit: Int = 10) {
 
       }
 
+    }
+  }
+}
+"""
+
+GAME_CACHE = {}
+
+
+GAME_METADATA_QUERY = """
+query SlugKuratorGame($slug: String!) {
+
+  slugKuratorGame(slug: $slug) {
+
+    name
+    slug
+    thumbnailUrl
+    type
+
+    data {
+      ... on GameKuratorThirdPartyGame {
+        provider {
+          name
+        }
+      }
     }
   }
 }
@@ -292,9 +315,6 @@ def parse_bet(entry):
         "game_slug":
             entry.get("game", {}).get("slug", ""),
 
-        "game_icon":
-            entry.get("game", {}).get("icon"),
-
         "amount": amount,
 
         "payout": payout,
@@ -350,16 +370,104 @@ async def get_stake_session():
 
     return stake_session
 
+async def get_game_metadata(slug):
 
-GAME_ICON_BASE = "https://stake.com/_app/immutable/assets/"
+    if not slug:
+        return None
 
 
-def build_stake_embed(bet):
+    # cache first
+    if slug in GAME_CACHE:
+        return GAME_CACHE[slug]
 
-    game = bet["game_name"].replace("-", " ").title()
+
+    headers = {
+        "x-access-token": STAKE_API_TOKEN,
+        "content-type": "application/json",
+    }
+
+
+    payload = {
+        "query": GAME_METADATA_QUERY,
+        "variables": {
+            "slug": slug
+        }
+    }
+
+
+    session = await get_stake_session()
+
+
+    try:
+
+        async with session.post(
+            GRAPHQL_URL,
+            headers=headers,
+            json=payload
+
+        ) as response:
+
+
+            data = await response.json()
+
+
+            game = (
+                data
+                .get("data", {})
+                .get("slugKuratorGame")
+            )
+
+
+            if game:
+
+                GAME_CACHE[slug] = game
+
+                return game
+
+
+    except Exception as e:
+
+        print(
+            "Game metadata error:",
+            e
+        )
+
+
+    return None
+    
+async def build_stake_embed(bet):
+
+    metadata = await get_game_metadata(
+    bet["game_slug"]
+    )
+
+
+    if metadata:
+
+        game = metadata["name"]
+
+        thumbnail = metadata.get(
+            "thumbnailUrl"
+        )
+
+
+        provider = (
+            metadata
+            .get("data", {})
+            .get("provider", {})
+            .get("name", "Unknown")
+        )
+
+    else:
+
+        game = bet["game_name"]
+
+        thumbnail = None
+
+        provider = "Unknown"
 
     embed = discord.Embed(
-        title="🎉 Big Win Detected!",
+        title="🎉 Big Win!",
         color=0x00ff88,
         timestamp=datetime.now(timezone.utc)
     )
@@ -370,6 +478,12 @@ def build_stake_embed(bet):
         inline=True
     )
 
+    embed.add_field(
+    name="🏢 Provider",
+    value=provider.title(),
+    inline=True
+    )
+    
     embed.add_field(
         name="💰 Bet",
         value=f"{bet['amount']:,.4f} {bet['currency']}",
@@ -405,10 +519,10 @@ def build_stake_embed(bet):
     )
 
     # We'll improve icon support later if Stake exposes icon paths.
-    if bet.get("game_icon"):
+    if thumbnail:
         try:
             embed.set_thumbnail(
-                url=GAME_ICON_BASE + bet["game_icon"]
+                 url=thumbnail
             )
         except:
             pass
@@ -495,7 +609,7 @@ async def check_stake_big_wins():
         if not should_post(bet):
             continue
 
-        embed = build_stake_embed(bet)
+        embed = await build_stake_embed(bet)
 
         try:
 
