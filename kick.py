@@ -109,6 +109,13 @@ CALL_CHANNEL_ID = 1470361355105075366
 
 STAKE_API_TOKEN = os.getenv("STAKE_API_TOKEN")
 
+print(
+    "Stake token loaded:",
+    bool(STAKE_API_TOKEN),
+    "length:",
+    len(STAKE_API_TOKEN or "")
+)
+
 STAKE_GUILD_ID = 1158852103268225104      # Your Discord server
 STAKE_CHANNEL_ID = 1158852103863795723    # Channel to post in
 
@@ -266,7 +273,10 @@ async def fetch_latest_bets():
             ) as response:
 
                 if response.status != 200:
+                    body = await response.text()
+                    
                     print(f"Stake API Error: {response.status}")
+                    print(f"Stake response: {body[:1000]}")
                     return []
 
                 data = await response.json()
