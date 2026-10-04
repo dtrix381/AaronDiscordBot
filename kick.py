@@ -582,7 +582,10 @@ async def check_stake_big_wins():
         ) as response:
 
             if response.status != 200:
-                print("Stake:", response.status)
+                body = await response.text()
+                
+                print(f"Stake API Error: {response.status}")
+                print(f"Stake response: {body[:2000]}")
                 return
 
             data = await response.json()
