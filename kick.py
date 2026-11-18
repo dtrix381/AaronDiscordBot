@@ -1363,7 +1363,7 @@ async def update_balance(
         user_id: int,
         delta: int,
         reason: str,
-        bot: discord.Client = None
+        bot_instance: discord.Client = None
 ) -> int:
     # Update player's coin balance
     await db.execute(
@@ -1407,27 +1407,25 @@ async def update_balance(
             f"back on the market for anyone to buy!"
         )
 
-        # Get bot object dynamically if not passed
-        if not bot:
-            from discord.utils import get
-            for task in asyncio.all_tasks():
-                if hasattr(task, "get_coro"):
-                    coro = task.get_coro()
-                    if coro and hasattr(coro, "cr_frame"):
-                        frame = coro.cr_frame
-                        if frame and "self" in frame.f_locals:
-                            potential_bot = frame.f_locals["self"]
-                            if isinstance(potential_bot, discord.Client):
-                                bot = potential_bot
-                                break
-
-        # Try sending announcement
+        # Use passed bot_instance or fall back to global 'bot'
+        client = bot_instance or globals().get("bot")
         channel = None
-        if bot:
-            channel = await get_guild_channel(guild_id, "redeem_channel_id")
-            if not channel:
-                guild = bot.get_guild(guild_id)
-                if guild:
+
+        if client:
+            guild = client.get_guild(guild_id)
+            if guild:
+                # Query redeem_channel_id directly from your database
+                async with db.execute(
+                    "SELECT redeem_channel_id FROM monopoly_channels WHERE guild_id=?",
+                    (guild_id,)
+                ) as cur:
+                    ch_row = await cur.fetchone()
+
+                if ch_row and ch_row[0]:
+                    channel = guild.get_channel(ch_row[0])
+
+                # Fallback to first available text channel if redeem_channel_id is empty/invalid
+                if not channel:
                     channel = next(
                         (c for c in guild.text_channels if c.permissions_for(guild.me).send_messages),
                         None
@@ -1442,6 +1440,7 @@ async def update_balance(
         await db.commit()
 
     return balance
+
 
 
 async def log_transaction(guild, msg=None, embed=None, file=None):
